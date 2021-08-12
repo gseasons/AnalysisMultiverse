@@ -22,7 +22,7 @@ class fmri_multiverse:
         from os.path import join as opj
         from bids.layout import BIDSLayout
         from nipype.interfaces.io import BIDSDataGrabber
-        from nipype import Workflow, Node, JoinNode, Function, DataSink
+        from nipype import Workflow, Node, JoinNode, Function, DataSink, IdentityInterface
         #GET AND RETURN IMPORTANT DATA, maybe write into containers pyradigm for organization
         #JUST DO ONE TASK FOR NOW, and only one session
         
@@ -87,6 +87,11 @@ class fmri_multiverse:
         #datasink.inputs.substitutions = substitutions
         tasks = ['fingerfootlips']
         session = ['test']
+        
+        group_cont = self.group_construction(subj[:4])
+        info_pass = Node(IdentityInterface(fields=['groups', 'mode']), name='group_pass')
+        info_pass.inputs.groups = group_cont
+        info_pass.inputs.mode = 'ols'
             
         for task in tasks:
             for ses in session:
@@ -100,7 +105,7 @@ class fmri_multiverse:
                                               #'bold_events': dict(datatype='func', suffix='events', session=ses),
                                               'T1w_files': dict(datatype='anat', suffix='T1w', session=ses)}
                     
-                    bids_dg.iterables = ('subject', subj[:2])
+                    bids_dg.iterables = ('subject', subj[:4])
                     
                     #WILL WANT TO PUT THESE IN WORKFLOW ASSEMBLY
                     data_proc = Workflow(name="data_proc")
@@ -141,11 +146,20 @@ class fmri_multiverse:
                         data_proc.connect(pre_wf, 'smooth.out_file', datasink, 'preproc.' + pipelineID + '.@smooth')
                         data_proc.connect(pre_wf, 'smooth.out_file', l1, 'modelspec.functional_runs')
                         
+                    processed_sub = JoinNode(IdentityInterface(fields=['copes', 'varcopes']), 
+                                             joinsource='bids_dg', joinfield=['copes', 'varcopes'], name='processed_sub')
                     
                     norm = self.spatial_normalization_flow()
+                    l2 = self.second_level_flow(groups=group_cont)
                     data_proc.connect([(pre_wf, norm, [('coregwf.bet_anat.out_file', 'warp.in_file')]),
                                        (pre_wf, norm, [('coregwf.bet_anat.out_file', 'prelim.in_file')]),
                                        (l1, norm, [('feat.feat_dir', 'selectfiles.base_directory')]),
+                                       (norm, processed_sub, [('outwarps.cope', 'copes')]),
+                                       (norm, processed_sub, [('outwarps.varcope', 'varcopes')]),
+                                       (processed_sub, l2, [('copes', 'inputnode.copes')]),
+                                       (processed_sub, l2, [('varcopes', 'inputnode.varcopes')]),
+                                       (info_pass, l2, [('groups', 'inputnode.groups')]),
+                                       (info_pass, l2, [('mode', 'inputnode.mode')]),
                                        ])
                     
                     data_proc.run()
@@ -172,9 +186,161 @@ class fmri_multiverse:
         #MAKE CONNECTIONS HERE
         A=3
         
+    #Will probably need to add user input to specify groups
+    def group_construction(self, subjects, split_half=True):
+        import itertools
+        group_container = []
+        if split_half:
+            prelim = list(itertools.combinations(subjects, round(len(subjects)/2)))
+            pre_len = len(prelim)
+            for i in range(pre_len):
+                if not (pre_len % 2):
+                    if i == (pre_len/2):
+                        break
+                    else:
+                        group_container.append([list(prelim[i]), list(prelim[-(i+1)])])
+                else:
+                    missed = [sub for sub in subjects if sub not in list(prelim[i])]
+                    group_container.append([missed, list(prelim[i])])
+        else:
+            #PLACEHOLDER
+            group_container.append([subjects, ['Single Group']])
+            
+        return group_container
+            
+    #FIXED EFFECTS WOULD BE TO AVERAGE ACROSS RUNS
+    #WOULD THEN RERUN AFTER
+    def second_level_flow(self, groups, mode='ols'):
+        from nipype import Node, JoinNode, MapNode, Workflow, SelectFiles, IdentityInterface, Function
+        from nipype.interfaces.fsl import L2Model, FLAMEO, Cluster, ImageMaths, Merge
+        import os
+        from os.path import join as opj
+        
+        #GROUPS: LIST OF LISTS OF SUBJECT IDs
+        inputnode = Node(IdentityInterface(fields=['subgroup', 'groups', 'copes', 'varcopes', 'mode']), name='inputnode')
+        inputnode.iterables = [('subgroup', range(len(groups)*2))]
+        inputnode.inputs.exp_dir = self.exp_dir
+        inputnode.inputs.working_dir = self.working_dir
+        
+        def construction(groups, copes, varcopes):
+            import re
+            subj_proc = len(copes)
+            contrasts = len(copes[0])
+            merge_contain_c = []
+            merge_contain_v = []
+            num_copes = []
+            
+            for group in groups:
+                if group[-1][0] == 'Single Group':
+                    for i in range(contrasts):
+                        merge_contain_c.append([cope[i] for cope in copes])
+                        merge_contain_v.append([varcope[i] for varcope in varcopes])
+                        num_copes.append(len(group[0]))
+                else:
+                    for subset in group:
+                        cont_c = []
+                        cont_v = []
+                        cont_g = []
+                        for i in range(contrasts):
+                            cont_c.append([cope[i] for cope in copes if re.search('_subject_([0-9]+)', cope[i]).group(1) in subset])
+                            cont_v.append([varcope[i] for varcope in varcopes if re.search('_subject_([0-9]+)', varcope[i]).group(1) in subset])
+                            cont_g.append(len(subset))
+                        
+                        num_copes.append(cont_g)
+                        merge_contain_c.append(cont_c)
+                        merge_contain_v.append(cont_v)       
+            
+            return merge_contain_c, merge_contain_v, num_copes
+        
+        
+        construct = Node(Function(input_names=['groups', 'copes', 'varcopes'], 
+                                  output_names=['merge_contain_c', 'merge_contain_v', 'num_copes'],
+                                  function=construction), name='construct')
+        
+        #OUTPUT OF CONSTRUCT: num_copes -> list of numbers
+        #                     merge_c -> list of list of lists (groups[group[contrast]])
+            
+        
+        l2model = MapNode(L2Model(), name='l2_model', iterfield=['num_copes'], nested=True)
+        #run_mode, sigma_dofs, outlier_iter
+        flameo = MapNode(FLAMEO(mask_file=opj(os.getenv('FSLDIR'), 'data/linearMNI/MNI152lin_T1_2mm_brain.nii.gz')), name='flameo', 
+                         iterfield=['cope_file', 'var_cope_file', 'design_file', 't_con_file', 
+                                    'cov_split_file'], nested=True) #'mask_file'
+        
+        def indexer(in_files, index):
+            return in_files[index]
+        
+        #merge_copes = MapNode(Function(input_names=['in_files','exp_dir','working_dir'], output_names='merged_file', 
+         #                            function=merge_contrasts), name='merge_copes', iterfield=['in_files'])
+        
+        #merge_var = MapNode(Function(input_names=['in_files','exp_dir','working_dir'], output_names='merged_file', 
+        #                             function=merge_contrasts), name='merge_var', iterfield=['in_files'])
+            
+        
+        
+        index_copes = Node(Function(input_names=['in_files', 'index'], 
+                                    ouput_names=['out'], 
+                                    function=indexer), name='index_copes')
+        
+        index_var = Node(Function(input_names=['in_files', 'index'], 
+                                  ouput_names=['out'], 
+                                  function=indexer), name='index_var')
+        
+        merge_copes =  MapNode(Merge(dimension='t'), name='merge_copes', 
+                               iterfield=['in_files'])#, nested=True)
+        
+        merge_var = MapNode(Merge(dimension='t'), name='merge_var', 
+                            iterfield=['in_files'])#, nested=True)
+        
+        cope_join = JoinNode(IdentityInterface(fields=['merged_file']), name='cope_join', joinsource='inputnode', joinfield='merged_file')
+        var_join = JoinNode(IdentityInterface(fields=['merged_file']), name='var_join', joinsource='inputnode', joinfield='merged_file')
+        
+        #make_mask = MapNode(ImageMaths(), name='make_mask', iterfield=['in_file'], nested=True)
+        #make_mask.inputs.op_string = '-abs -Tmin -bin'
+        
+        l2 = Workflow(name='l2')
+        l2.base_dir = opj(self.exp_dir, self.working_dir)
+        
+        l2.connect([(inputnode, construct, [('groups', 'groups')]),
+                    (inputnode, construct, [('copes', 'copes')]),
+                    (inputnode, construct, [('varcopes', 'varcopes')]),
+                    
+                    (construct, index_copes, [('merge_contain_c', 'in_files')]),
+                    (construct, index_var, [('merge_contain_v', 'in_files')]),
+                    (inputnode, index_copes, [('subgroup', 'index')]),
+                    (inputnode, index_var, [('subgroup', 'index')]),
+                    
+                    (index_copes, merge_copes, [('out', 'in_files')]),
+                    (index_var, merge_var, [('out', 'in_files')]),
+                    
+                    (merge_copes, cope_join, [('merged_file', 'merged_file')]),
+                    (merge_var, var_join, [('merged_file', 'merged_file')]),
+                    
+                    (construct, l2model, [('num_copes', 'num_copes')]),
+                    
+                    #(cope_join, make_mask, [('merged_file', 'in_file')]),
+                    
+                    #(make_mask, flameo, [('out_file', 'mask_file')]),
+                    
+                    (cope_join, flameo, [('merged_file', 'cope_file')]),
+                    (var_join, flameo, [('merged_file', 'var_cope_file')]),
+                    
+                    (l2model, flameo, [('design_mat', 'design_file'),
+                                       #t_con_file might just need to be run0.mat
+                                       ('design_con', 't_con_file'),
+                                       ('design_grp', 'cov_split_file')]),
+                    (inputnode, flameo, [('mode', 'run_mode')])
+                    
+                    #CONTINUE TOMORROW
+                    ])
+        
+        return l2
+        
+    
+        
     def spatial_normalization_flow(self):
         from nipype.interfaces.fsl import FNIRT, ApplyWarp, FLIRT
-        from nipype import Node, MapNode, Workflow, SelectFiles
+        from nipype import Node, MapNode, Workflow, SelectFiles, IdentityInterface
         import os
         from os.path import join as opj
         #COULD PROBABLY CHANGE THESE PARAMETERS - ASK ERIN, TONS FOR FNIRT
@@ -195,6 +361,7 @@ class fmri_multiverse:
                      'varcope': 'stats/varcope*.nii.gz'}
         
         selectfiles = Node(SelectFiles(templates, sort_filelist=True), name='selectfiles')
+        outwarps = Node(IdentityInterface(fields=['cope', 'varcope']), name='outwarps')
         
         warpflow = Workflow('warpflow')
         warpflow.base_dir = opj(self.exp_dir, self.working_dir)
@@ -208,6 +375,8 @@ class fmri_multiverse:
                           (selectfiles, applywarp_z, [('z_stat', 'in_file')]),
                           (selectfiles, applywarp_c, [('cope', 'in_file')]),
                           (selectfiles, applywarp_v, [('varcope', 'in_file')]),
+                          (applywarp_c, outwarps, [('out_file', 'cope')]),
+                          (applywarp_v, outwarps, [('out_file', 'varcope')]),
                           ])
         
         return warpflow
