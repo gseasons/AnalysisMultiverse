@@ -29,7 +29,7 @@ subject_list = ['01', '02']
 task_list = ['fingerfootlips']
 
 # Smoothing widths to apply
-fwhm = [4, 8]
+fwhm = [4]
 
 # TR of functional images
 with open(data_path + 'task-fingerfootlips_bold.json', 'rt') as fp:

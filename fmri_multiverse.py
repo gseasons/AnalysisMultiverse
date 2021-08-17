@@ -187,7 +187,7 @@ class fmri_multiverse:
         A=3
         
     #Will probably need to add user input to specify groups
-    def group_construction(self, subjects, split_half=True):
+    def group_construction(self, subjects, split_half=True, average=False):
         import itertools
         group_container = []
         if split_half:
@@ -202,6 +202,11 @@ class fmri_multiverse:
                 else:
                     missed = [sub for sub in subjects if sub not in list(prelim[i])]
                     group_container.append([missed, list(prelim[i])])
+        elif average:
+            if type(subjects) == list:
+                group_container.append([subjects])
+            else:
+                group_container.append([[subjects]])
         else:
             #PLACEHOLDER
             group_container.append([subjects, ['Single Group']])
@@ -217,10 +222,12 @@ class fmri_multiverse:
         from os.path import join as opj
         
         #GROUPS: LIST OF LISTS OF SUBJECT IDs
-        inputnode = Node(IdentityInterface(fields=['subgroup', 'groups', 'copes', 'varcopes', 'mode']), name='inputnode')
-        inputnode.iterables = [('subgroup', range(len(groups)*2))]
-        inputnode.inputs.exp_dir = self.exp_dir
-        inputnode.inputs.working_dir = self.working_dir
+        inputnode = Node(IdentityInterface(fields=['groups', 'copes', 'varcopes', 'mode']), name='inputnode')
+        
+        iternode = Node(IdentityInterface(fields=['subgroup']), name='iternode')
+        iternode.iterables = [('subgroup', range(len(groups)*len(groups[0])))]
+        #inputnode.inputs.exp_dir = self.exp_dir
+        #inputnode.inputs.working_dir = self.working_dir
         
         def construction(groups, copes, varcopes):
             import re
@@ -292,8 +299,8 @@ class fmri_multiverse:
         merge_var = MapNode(Merge(dimension='t'), name='merge_var', 
                             iterfield=['in_files'])#, nested=True)
         
-        cope_join = JoinNode(IdentityInterface(fields=['merged_file']), name='cope_join', joinsource='inputnode', joinfield='merged_file')
-        var_join = JoinNode(IdentityInterface(fields=['merged_file']), name='var_join', joinsource='inputnode', joinfield='merged_file')
+        cope_join = JoinNode(IdentityInterface(fields=['merged_file']), name='cope_join', joinsource='iternode', joinfield='merged_file')
+        var_join = JoinNode(IdentityInterface(fields=['merged_file']), name='var_join', joinsource='iternode', joinfield='merged_file')
         
         #make_mask = MapNode(ImageMaths(), name='make_mask', iterfield=['in_file'], nested=True)
         #make_mask.inputs.op_string = '-abs -Tmin -bin'
@@ -307,8 +314,8 @@ class fmri_multiverse:
                     
                     (construct, index_copes, [('merge_contain_c', 'in_files')]),
                     (construct, index_var, [('merge_contain_v', 'in_files')]),
-                    (inputnode, index_copes, [('subgroup', 'index')]),
-                    (inputnode, index_var, [('subgroup', 'index')]),
+                    (iternode, index_copes, [('subgroup', 'index')]),
+                    (iternode, index_var, [('subgroup', 'index')]),
                     
                     (index_copes, merge_copes, [('out', 'in_files')]),
                     (index_var, merge_var, [('out', 'in_files')]),

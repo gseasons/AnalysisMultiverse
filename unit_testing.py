@@ -6,7 +6,7 @@ Created on Wed Aug 11 11:48:57 2021
 @author: grahamseasons
 """
 
-def group_construction(subjects, split_half=True):
+def group_construction(subjects, split_half=True, average=False):
         import itertools
         group_container = []
         if split_half:
@@ -21,6 +21,11 @@ def group_construction(subjects, split_half=True):
                 else:
                     missed = [sub for sub in subjects if sub not in list(prelim[i])]
                     group_container.append([missed, list(prelim[i])])
+        elif average:
+            if type(subjects) == list:
+                group_container.append([subjects])
+            else:
+                group_container.append([[subjects]])
         else:
             #PLACEHOLDER
             group_container.append([subjects, ['Single Group']])
