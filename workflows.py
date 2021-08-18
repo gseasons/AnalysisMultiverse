@@ -578,7 +578,7 @@ class spatial_normalization:
         selectfiles = Node(SelectFiles(templates, sort_filelist=True), name='selectfiles')
         
         warpflow.connect([(inputnode, prelim, [('brain', 'in_file')]),
-                          (inputnode, prelim, [('ref_file', 'reference')])
+                          (inputnode, prelim, [('ref_file', 'reference')]),
                           (inputnode, warp, [('brain', 'in_file')]),
                           (inputnode, warp, [('ref_file', 'ref_file')]),
                           (inputnode, applywarp_c, [('ref_file', 'ref_file')]),
@@ -973,14 +973,39 @@ class split_half:
                             
 from nipype.interfaces.fsl import MultipleRegressDesign
 
-class level3(level2):
+class level3:#(level2):
     def __init__(self, exp_dir, working_dir):
         self.exp_dir = exp_dir
         self.working_dir = working_dir
-        super().__init__(exp_dir, working_dir)
+        #super().__init__(exp_dir, working_dir)
         
     def construct(self):
-        A = 3
+        l3analysis = Workflow('l3analysis')
+        l3analysis.base_dir = opj(self.exp_dir, self.working_dir)
+        
+        inputnode = Node(IdentityInterface(fields=['covariates', 'copes', 'varcopes',
+                                                   'mask', 'mode']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['copes', 'var_copes', 'zstats', 
+                                                 'flameo_stats']), name='outnode')
+        
+        test = self.setup()
+        analysis = self.third_level_flow()
+        
+        l3analysis.connect([(inputnode, test, [('covariates', 'inputnode.covariate')]),
+                            (inputnode, analysis, [('copes', 'inputnode.copes'),
+                                                   ('varcopes', 'inputnode.varcopes'),
+                                                   ('mask', 'inputnode.mask'),
+                                                   ('mode', 'inputnode.mode')]),
+                            (test, analysis, [('outnode.regressors', 'inputnode.regressors'),
+                                              ('outnode.contrasts', 'inputnode.contrasts'),
+                                              ('outnode.group_ids', 'inputnode.group_ids')]),
+                            (analysis, outnode, [('outnode.copes', 'copes'),
+                                                 ('outnode.var_copes', 'var_copes'),
+                                                 ('outnode.zstats', 'zstats'),
+                                                 ('outnode.flameo_stats', 'flameo_stats')]),
+                            ])
+        
+        return l3analysis
         
     def setup(self):
         #CREATE PAIRED AND UNPAIRED T-TEST SETUP
@@ -999,39 +1024,49 @@ class level3(level2):
             EVs = {}
             contrasts = []
             
-            if groupcat not in categories:
-                groupcat = categories[0]
-                
-            #ASSUMES unpaired t-test
-            #THIS IS EXPECTING STRING CATEGORIES FOR GROUPS -> could probably eliminate need with inclusing of json file
-            group = covariates.groupby(groupcat)
-            num_groups = len(group.count())
-            encoded = group.ngroup().to_list()
-            labels = covariates[groupcat].unique()
-            contrast = []
-            
-            for i in range(num_groups):
-                ev = [1 if val == i else 0 for val in encoded]
-                EVs[labels[i]] = ev
-                
-                solo = [labels[i] + ' mean', 'T', [labels[i]], [1]] #-> I THINK THIS MIGHT BE AN F CONTRAST
-                contrast = [[labels[i] + '-' + lab, 'T', [labels[i], lab], [1,-1]] if lab != labels[i] else solo for lab in labels]
-                contrasts.append(contrast)
-                
-            #NOTE: FOR THE NON-GROUP COVARIATES THEY ARE ADDED AS IS RIGHT NOW -> NO DEMEANING/ORTHOGONALIZATION
-            cov = covariates.drop(groupcat, axis=1)
-            cat = categories.remove(groupcat)
-            
-            for c in cat:
-                labels = cov[c].unique()
-                
-                if type(labels[0]) == str:
-                    encode = labels.ngroup().to_list()
-                    EVs[c] = encode
-                else:
-                    EVs[c] = cov[c].to_list()
+            #IF NO GROUPS OR ANYTHING
+            if len(categories) > 0:
+                if groupcat not in categories:
+                    groupcat = categories[0]
                     
-            return EVs, contrasts, encoded
+                #ASSUMES unpaired t-test
+                #THIS IS EXPECTING STRING CATEGORIES FOR GROUPS -> could probably eliminate need with inclusing of json file
+                group = covariates.groupby(groupcat)
+                num_groups = len(group.count())
+                group_ids = (group.ngroup() + 1).to_list()
+                encoded = group.ngroup().to_list()
+                labels = covariates[groupcat].unique()
+                contrast = []
+                
+                for i in range(num_groups):
+                    ev = [1 if val == i else 0 for val in encoded]
+                    EVs[labels[i]] = ev
+                    
+                    solo = [labels[i] + ' mean', 'T', [labels[i]], [1]] #-> I THINK THIS MIGHT BE AN F CONTRAST
+                    contrast = [[labels[i] + '-' + lab, 'T', [labels[i], lab], [1,-1]] if lab != labels[i] else solo for lab in labels]
+                    contrasts.append(contrast)
+                    
+                #NOTE: FOR THE NON-GROUP COVARIATES THEY ARE ADDED AS IS RIGHT NOW -> NO DEMEANING/ORTHOGONALIZATION
+                cov = covariates.drop(groupcat, axis=1)
+                cat = categories.remove(groupcat)
+                
+                for c in cat:
+                    labels = cov[c].unique()
+                    
+                    if type(labels[0]) == str:
+                        encode = labels.ngroup().to_list()
+                        EVs[c] = encode
+                    else:
+                        EVs[c] = cov[c].to_list()
+            else:
+                single_group = [1] * len(covariates.index)
+                label = 'group_mean'
+                EVs[label] = single_group
+                group_ids = single_group
+                contrasts.append([label, 'T', [label], [1]])
+                
+                    
+            return EVs, contrasts, group_ids
         
         unpaired = Node(Function(input_names=['covariate'],
                                  output_names=['EVs', 'contrasts'],
@@ -1040,35 +1075,162 @@ class level3(level2):
         groups.connect([(inputnode, unpaired, [('covariate', 'covariate')]),
                         (unpaired, outnode, [('EVs', 'regressors'),
                                              ('contrasts', 'contrasts'),
-                                             ('encoded', 'group_ids')]),
+                                             ('group_ids', 'group_ids')]),
                         ])
         
         return groups
 
     def third_level_flow(self):
-        from nipype.interfaces.fsl import MultipleRegressDesign
+        from nipype.interfaces.fsl import MultipleRegressDesign#, Randomise
         l3 = Workflow('l3')
         l3.base_dir = opj(self.exp_dir, self.working_dir)
         
-        inputnode = Node(IdentityInterface(fields=['regressors', 'contrasts', 'group_ids']), name='inputnode')
-        outnode = Node(IdentityInterface(fields=[]), name='outnode')
+        inputnode = Node(IdentityInterface(fields=['regressors', 'contrasts', 'group_ids',
+                                                   'copes', 'varcopes', 'mask', 'mode']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['copes', 'var_copes', 'zstats', 'flameo_stats']), name='outnode')
         
         model = Node(MultipleRegressDesign(), name='model')
         
-        merge = Node(Merge(dimension='t'), name='merge')
+        #NOTE: THIS MIGHT REQUIRE FURTHER SEPARATION INTO GROUPS INSTEAD OF JUST GROUPING BY CONTRASTS
+        def group_contrast(lst):
+            subs = len(lst)
+            contrasts = len(lst[0])
+            grouped = []
+            for con in range(contrasts):
+                grouped.append([lst[sub][con] for sub in range(subs)])
+            
+            return grouped
         
-        flameo = Node(FLAMEO(), name='flameo')
+        merge_copes = MapNode(Merge(dimension='t'), name='merge_copes', iterfield=['in_files'])
+        merge_var = MapNode(Merge(dimension='t'), name='merge_var', iterfield=['in_files'])
+        
+        flameo = MapNode(FLAMEO(), name='flameo', iterfield=['cope_file', 'var_cope_file'])
+        
+        #correct = MapNode(Randomise(), name='correct', iterfield=[])
+        
+        #NOTE: CAN MAKE MASK FILES USING LOWER LEVEL STATS MASK OUTPUT
         
         #TODO: FINISH CONNECTING TO FLAMEO, IMPLEMENT CLUSTER CORRECTION -> START BUILDING OUTER WORKFLOW
         
         l3.connect([(inputnode, model, [('regressors', 'regressors'),
                                         ('contrasts', 'contrasts'),
                                         ('group_ids', 'groups')]),
+                    (inputnode, merge_copes, [(('copes', group_contrast), 'in_files')]),
+                    (inputnode, merge_var, [(('varcopes', group_contrast), 'in_files')]),
+                    (inputnode, flameo, [('mask', 'mask_file'),
+                                         ('mode', 'run_mode')]),
+                    (merge_copes, flameo, [('merged_file', 'cope_file')]),
+                    (merge_var, flameo, [('merged_file', 'var_cope_file')]),
                     (model, flameo, [('design_con', 't_con_file'),
                                      ('design_grp', 'cov_split_file'),
                                      ('design_fts', 'f_con_file'),
                                      ('design_mat', 'design_file')]),
+                    (flameo, outnode, [('copes', 'copes'),
+                                       ('var_copes', 'var_copes'),
+                                       ('zstats', 'zstats'),
+                                       ('stats_dir', 'flameo_stats')]),
                     ])
+        
+        return l3
+    
+from nipype.interfaces.base import CommandLine
+from nipype.interfaces.fsl import Cluster, BinaryMaths, Threshold, SmoothEstimate
+import re
+#import subprocess import run
+    
+class correction:
+    def __init__(self, exp_dir, working_dir):
+        self.exp_dir = exp_dir
+        self.working_dir = working_dir
+        
+    def construct(self):
+        A=3
+    
+    def FWE(self):
+        A=3
+        #TODO: NON CLUSTER FWE, GENERATE ANALYSIS WORKFLOW
+        
+    def clusterFWE(self):
+        Cluster = Workflow('Cluster')
+        Cluster.base_dir = opj(self.exp_dir, self.working_dir)
+        
+        inputnode = Node(IdentityInterface(fields=['zstat', 'mask', 'connectivity', 'copes' 
+                                                   'threshold', 'pthreshold']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['corrected']), name='outnode')
+        
+        smoothness = MapNode(SmoothEstimate(), name='smoothness')
+        
+        cluster_pos = MapNode(Cluster(out_index_file=True, out_local_max_txt_file=True), name='cluster_pos')
+        cluster_neg = MapNode(Cluster(out_index_file=True, out_local_max_txt_file=True), name='cluster_neg')
+        
+        zstat_inv = MapNode(BinaryMaths(operation='mul', operand_value=-1), name='zstat_inv')
+        cluster_inv = MapNode(BinaryMaths(operation='mul', operand_value=-1), name='cluster_inv')
+        cluster_all = MapNode(BinaryMaths(operation='add'), name='cluster_all')
+        
+        Cluster.connect([(inputnode, smoothness, [('zstat', 'zstat_file'),
+                                                  ('mask', 'mask')]),
+                         (inputnode, cluster_neg, [('connectivity', 'connectivity'),
+                                                   ('threshold', 'threshold'),
+                                                   ('pthreshold', 'pthreshold'),
+                                                   ('copes', 'cope_file')]),
+                         (inputnode, cluster_pos, [('connectivity', 'connectivity'),
+                                                   ('threshold', 'threshold'),
+                                                   ('pthreshold', 'pthreshold'),
+                                                   ('zstat', 'in_file'),
+                                                   ('copes', 'cope_file')]),
+                         (inputnode, zstat_inv, [('zstat', 'in_file')]),
+                         (smoothness, cluster_neg, [('volume', 'volume'),
+                                                    ('dlh', 'dlh')]),
+                         (smoothness, cluster_pos, [('volume', 'volume'),
+                                                    ('dlh', 'dlh')]),
+                         (zstat_inv, cluster_neg, [('out_file', 'in_file')]),
+                         (cluster_neg, cluster_inv, [('threshold_file', 'in_file')]),
+                         (cluster_pos, cluster_all, [('threshold_file', 'in_file')]),
+                         (cluster_inv, cluster_all, [('out_file', 'operand_file')]),
+                         (cluster_all, outnode, [('out_file', 'corrected')]),
+                         ])
+        
+        return Cluster
+        
+        
+    def FDR(self):
+        FDR = Workflow('FDR')
+        FDR.base_dir = opj(self.exp_dir, self.working_dir)
+        
+        inputnode = Node(IdentityInterface(fields=['zstat', 'mask', 'p']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['corrected']), name='outnode')
+        
+        p_file = MapNode(ImageMaths(op_string='-ztop', suffix='_pval'), name='p_file', iterfield=['in_file'])
+        
+        def fdr(p_im, mask, q): #q = 0.05
+            cmd = ('fdr -i {p_im} -m {mask} -q {q}')
+            cl = CommandLine(cmd.format(p_im=p_im, mask=mask, q=q))
+            results = cl.run().runtime.stdout
+            thresh = 1 - float(re.search('([0-9\.]+)', results).group(1))
+            
+            form = '-mul -1 -add 1 -thr {thresh} -mas {mask}'.format(thresh=thresh, mask=mask)
+            
+            return form
+        
+        form = MapNode(Function(input_names=['p_im', 'mask', 'q'],
+                               output_names=['form_str'], function=fdr), name='form', iterfield=['p_im'])
+        
+        
+        corrected = MapNode(ImageMaths(suffix='_fdr'), name='corrected', iterfield=['in_file'])
+        
+        FDR.connect([(inputnode, p_file, [('zstat', 'in_file')]),
+                     (inputnode, form, [('mask', 'mask'),
+                                        ('p', 'q')]),
+                     (p_file, form, [('out_file', 'p_im')]),
+                     (form, corrected, [('form_str', 'op_string')]),
+                     (p_file, corrected, [('out_file', 'in_file')]),
+                     (corrected, outnode, [('out_file', 'corrected')])
+                     ])
+        
+        return FDR
+            
+    
+    #Randomize?
                 
                 
                 
@@ -1079,5 +1241,6 @@ class level3(level2):
 #B = level1('/Users/grahamseasons/fMRI/output_comp', 'working_dir').construct()
 #C = spatial_normalization('/Users/grahamseasons/fMRI/output_comp', 'working_dir').construct()
 #D = level2('/Users/grahamseasons/fMRI/output_comp', 'working_dir', 4).construct()
-E = split_half('/Users/grahamseasons/fMRI/output_comp', 'working_dir').construct()
+#E = split_half('/Users/grahamseasons/fMRI/output_comp', 'working_dir').construct()
+F = level3('/Users/grahamseasons/fMRI/output_comp', 'working_dir').construct()
 B=3
