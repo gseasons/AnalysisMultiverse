@@ -31,6 +31,9 @@ class fmri_multiverse:
         types = layout.get_datatypes()
         session = layout.get_sessions()
         #im_type = layout.get_suffix(datatype='func') #change modality depending on info for anat, dwi, func
+        from unit_testing import t_test
+        file = layout.get(return_type='filename', extension='.tsv', suffix='participants')
+        t_test(file)
         tasks = layout.get_tasks()
         
         #CHANGE SO THAT RETURNS SLICE TIMINGS AS WELL
