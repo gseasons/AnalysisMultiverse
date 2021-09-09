@@ -79,15 +79,24 @@ def FWE(base_dir, zstat, p, mask):
         thresh = MapNode(Function(input_names=['p', 'resels'],
                                output_names=['thresh'], function=fwe), name='thresh', iterfield=['resels'], nested=True)
         
-        def neg(val):
-            return -1 * val
+        def neg(vals):
+            isnested = any(isinstance(i, list) for i in vals)
+            if isnested:
+                val = [[-1 * val for val in sublst] for sublst in vals]
+            else:
+                if type(vals) == list:
+                    val = [-1 * val for val in vals]
+                else:
+                    val = -1 * val
+                
+            return val
         
-        fwe_nonsig0 = MapNode(Threshold(direction='above'), name='fwe_nonsig0', iterfield=['in_file'], nested=True)
-        fwe_nonsig1 = MapNode(Threshold(direction='below'), name='fwe_nonsig1', iterfield=['in_file'], nested=True)
+        fwe_nonsig0 = MapNode(Threshold(direction='above'), name='fwe_nonsig0', iterfield=['in_file', 'thresh'], nested=True)
+        fwe_nonsig1 = MapNode(Threshold(direction='below'), name='fwe_nonsig1', iterfield=['in_file', 'thresh'], nested=True)
         fwe_thresh = MapNode(BinaryMaths(operation='sub'), name='fwe_thresh', iterfield=['in_file', 'operand_file'], nested=True)
         
         FWE.connect([(inputnode, smoothness, [('zstat', 'zstat_file'),
-                                              ('mask', 'mask')]),
+                                              ('mask', 'mask_file')]),
                      (inputnode, thresh, [('p', 'p')]),
                      (inputnode, fwe_thresh, [('zstat', 'in_file')]),
                      (inputnode, fwe_nonsig0, [('zstat', 'in_file')]),
@@ -157,9 +166,10 @@ def clusterFWE(base_dir, p, z_thresh, mask, connectivity, copes, zstat):
         
         return cluster
         
-        
+#TODO: FIX THIS
 def FDR(base_dir, zstat, p, mask):
         #RETURNS CORRECTED 1-P IMAGE
+        #SEPARATE POSITIVE AND NEGATIVE FORMS
         FDR = Workflow('FDR')
         FDR.base_dir = base_dir #self.base_dir
         
