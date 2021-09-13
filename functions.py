@@ -52,6 +52,32 @@ def get_bright_thresh(medianval):
 def getthreshop(thresh):
     return '-thr %.10f -Tmin -bin' % (0.1 * thresh[1])
 
+def parse_xml(xml, goal, mask):
+    import xml.etree.ElementTree as ET
+    import re, os, glob
+    search = ''
+    fsl = os.getenv('FSLDIR')
+    for word in goal.split(' '):
+        search +=  word + '.*'
+        
+    ind = 2 - int(re.search('_([0-9])mm', mask).group(1))
+    if xml.lower() in 'harvard-oxford':
+        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+            tree = ET.parse(atlas)
+            root = tree.getroot()
+        
+            for label in root.iter('label'):
+                name = label.text
+                if re.search(search, name, re.IGNORECASE):
+                    file = fsl + '/data/atlases' + root.findall('.//header/images/imagefile')[ind].text + '.nii.gz'
+                    index = label.attrib['index']
+                    out_name = name
+            
+        return file, index, out_name
+    
+    else:
+        print('ERROR')
+
 def FWE(base_dir, zstat, p, mask):
         #RETURNS CORRECTED ZSCORE IMAGE
         FWE = Workflow('FWE')
@@ -209,3 +235,118 @@ def FDR(base_dir, zstat, p, mask):
                      ])
         
         return FDR
+    
+class spatial_normalization:
+    def __init__(self):
+        self.dec = True
+        
+    def construct(self):
+        if self.dec:
+            self.dec = False
+            return self.get_warps()
+        else:
+            self.dec = True
+            return self.apply_warps()
+    
+    def get_warps(self):
+        from nipype.interfaces.fsl import InvWarp
+        genwarps = Workflow('genwarps')
+        genwarps.base_dir = os.getcwd() #self.base_dir
+        
+        inputnode = Node(IdentityInterface(fields=['brain', 'ref_file']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['warp', 'invwarp']), name='outnode')
+        
+        prelim = Node(FLIRT(dof=12, output_type='NIFTI_GZ'), name='prelim')
+        warp = Node(FNIRT(field_file=True), name='warp')
+        
+        warp_inv = Node(InvWarp(), name='warp_inv')
+        
+        genwarps.connect([(inputnode, prelim, [('brain', 'in_file')]),
+                          (inputnode, prelim, [('ref_file', 'reference')]),
+                          (inputnode, warp, [('brain', 'in_file')]),
+                          (inputnode, warp, [('ref_file', 'ref_file')]),
+                          (prelim, warp, [('out_matrix_file', 'affine_file')]),
+                          (warp, warp_inv, [('field_file', 'warp')]),
+                          (inputnode, warp_inv, [('brain', 'reference')]),
+                          (warp, outnode, [('field_file', 'warp')]),
+                          (warp_inv, outnode, [('inverse_warp', 'invwarp')]),
+                          ])
+        
+        return genwarps
+        
+    def apply_warps(self):
+        appwarps = Workflow('appwarps')
+        appwarps.base_dir = os.getcwd()
+        
+        inputnode = Node(IdentityInterface(fields=['feat_dir', 'warp_file', 'ref_file', 'needwarp']), name='inputnode')
+        outnode = Node(IdentityInterface(fields=['cope', 'varcope', 'bold']), name='outnode')
+        
+        templates = {'cope': 'stats/cope*.nii.gz',
+                     'varcope': 'stats/varcope*.nii.gz',
+                     'bold': 'filtered_func_data.nii.gz'}
+        
+        selectfiles = Node(SelectFiles(templates, sort_filelist=True), name='selectfiles')
+        
+        def identity(cope, varcope, bold, needwarp):
+            from nipype.interfaces.fsl import ImageMaths
+            from nipype import Node
+            
+            if not needwarp:
+                clear = Node(ImageMaths(op_string='-mul 0 -bin'), name='clear')
+                clear.inputs.in_file = cope
+                cope = clear.run().outputs.out_file
+                varcope = cope
+                bold = cope
+            
+            return cope, varcope, bold
+        
+        ident = MapNode(Function(input_names=['cope', 'varcope', 'bold', 'needwarp'],
+                              output_names=['cope', 'varcope', 'bold'], function=identity), name='ident', iterfield=['cope', 'varcope'])
+        
+        def ret_files(cope_orig, varcope_orig, bold_orig, cope_warp, varcope_warp, bold_warp, needwarp):
+            if not needwarp:
+                return cope_orig, varcope_orig, bold_orig
+            else:
+                return cope_warp, varcope_warp, bold_warp
+            
+        ret = MapNode(Function(input_names=['cope_orig', 'varcope_orig', 'bold_orig', 'cope_warp', 
+                                         'varcope_warp', 'bold_warp', 'needwarp'],
+                            output_names=['cope', 'varcope', 'bold'], function=ret_files), name='ret', iterfield=['cope_orig', 'varcope_orig', 'cope_warp', 'varcope_warp'])
+        
+        def check_bold(bolds):
+            if type(bolds) == list:
+                return bolds[0]
+            else:
+                return bolds
+        
+        applywarp_c = MapNode(ApplyWarp(), name='applywarp_c', iterfield=['in_file'])
+        applywarp_v = MapNode(ApplyWarp(), name='applywarp_v', iterfield=['in_file'])
+        applywarp_bold = Node(ApplyWarp(), name='applywarp_bold')
+        
+        appwarps.connect([(inputnode, applywarp_c, [('ref_file', 'ref_file')]),
+                          (inputnode, applywarp_v, [('ref_file', 'ref_file')]),
+                          (inputnode, applywarp_bold, [('ref_file', 'ref_file')]),
+                          (inputnode, applywarp_c, [('warp_file', 'field_file')]),
+                          (inputnode, applywarp_v, [('warp_file', 'field_file')]),
+                          (inputnode, applywarp_bold, [('warp_file', 'field_file')]),
+                          (inputnode, selectfiles, [('feat_dir', 'base_directory')]),
+                          (inputnode, ret, [('needwarp', 'needwarp')]),
+                          (selectfiles, ident, [('cope', 'cope')]),
+                          (selectfiles, ident, [('varcope', 'varcope')]),
+                          (selectfiles, ident, [('bold', 'bold')]),
+                          (inputnode, ident, [('needwarp', 'needwarp')]),
+                          (ident, applywarp_c, [('cope', 'in_file')]),
+                          (ident, applywarp_v, [('varcope', 'in_file')]),
+                          (ident, applywarp_bold, [(('bold', check_bold), 'in_file')]),
+                          (applywarp_c, ret, [('out_file', 'cope_warp')]),
+                          (applywarp_v, ret, [('out_file', 'varcope_warp')]),
+                          (applywarp_bold, ret, [('out_file', 'bold_warp')]),
+                          (selectfiles, ret, [('cope', 'cope_orig')]),
+                          (selectfiles, ret, [('varcope', 'varcope_orig')]),
+                          (selectfiles, ret, [('bold', 'bold_orig')]),
+                          (ret, outnode, [('cope', 'cope')]),
+                          (ret, outnode, [('varcope', 'varcope')]),
+                          (ret, outnode, [('bold', 'bold')]),
+                          ])
+        
+        return appwarps

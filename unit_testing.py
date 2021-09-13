@@ -236,22 +236,39 @@ def parse_xml(xml, goal, mask):
                 if re.search(search, name, re.IGNORECASE):
                     file = fsl + '/data/atlases' + root.findall('.//header/images/imagefile')[ind].text + '.nii.gz'
                     index = label.attrib['index']
+                    out_name = name
             
-        return file, index
+        return file, index, out_name
     
     else:
         print('ERROR')
-        
-def get_ts(file, seed):
-    from nipype.interfaces.base import CommandLine
-    import re, os
-    out = os.getcwd() + re.search('.*/(.*)_bold', file).group(1) + 'EV.txt'
-    cmd = ('fslmeants -i {file} -o {out} -m {seed}')
-    cl = CommandLine(cmd.format(file=file, out=out, seed=seed))
-    cl.run().runtime.stdout
-    
-    return out
-        
+
+##def resting_state():
+ #   if 
+from nipype import Workflow, Node, IdentityInterface
+from nipype.interfaces.fsl import ApplyWarp, ImageMaths
+from nipype.algorithms.modelgen import SpecifyModel
+
+HP = 128
+TR = 2.5
+outliers = '/Volumes/NewVolume/ds000114-new/working_dir/fmri/preprocess/imageproc/_sessions_test/_task_fingerfootlips/_pipeline_0/_subject_02/art/art.sub-02_ses-test_task-fingerfootlips_bold_roi_mcf_st_flirt_outliers.txt'
+smoothed = '/Volumes/NewVolume/ds000114-new/working_dir/fmri/preprocess/imageproc/_sessions_test/_task_fingerfootlips/_pipeline_0/_subject_02/smoothnode/smooth/smooth_su/sub-02_ses-test_task-fingerfootlips_bold_roi_mcf_st_flirt_smooth.nii.gz'
+mc_par = '/Volumes/NewVolume/ds000114-new/working_dir/fmri/preprocess/imageproc/_sessions_test/_task_fingerfootlips/_pipeline_0/_subject_02/mc/sub-02_ses-test_task-fingerfootlips_bold_roi_mcf.nii.par'
+
+# =============================================================================
+# 
+# model = Node(SpecifyModel(input_units='secs', parameter_source='FSL'), name='model')
+# model.inputs.outlier_files = outliers
+# model.inputs.realignment_parameters = mc_par
+# model.inputs.time_repetition = TR
+# model.inputs.high_pass_filter_cutoff = HP
+# model.inputs.functional_runs = smoothed
+# model.inputs.event_files = ['/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp03abik6m/mean_ts/sub-03_ses-test_task-fingerfootlips_bold_roi_mcf_st_flirt_smooth_warp_ts.txt']
+# model.run()
+# =============================================================================
+
+ 
+ 
 from os.path import join as opj
 import os
 
@@ -262,7 +279,7 @@ groups = [[['01', '02', '03', '04', '05'], ['06', '07', '08', '09', '10']], [['0
 mask = opj(os.getenv('FSLDIR'), 'data/linearMNI/MNI152lin_T1_2mm_brain.nii.gz')
 xml = 'harvard'#opj(os.getenv('FSLDIR'), 'data/atlases/HarvardOxford-Cortical.xml')
 #predict(groups, covariate, bold, mask)
-goal = 'inf temp temp'
+goal = 'cing post'#'inf temp temp'
 parse_xml(xml, goal, mask)
 
 stats = [['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo0/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo1/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo2/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo3/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo4/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo5/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo6/stats/zstat1.nii.gz'], ['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo7/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo8/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo9/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo10/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo11/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo12/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo13/stats/zstat1.nii.gz'], ['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo14/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo15/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo16/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo17/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo18/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo19/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo20/stats/zstat1.nii.gz'], ['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo21/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo22/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo23/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo24/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo25/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo26/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo27/stats/zstat1.nii.gz'], ['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo28/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo29/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo30/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo31/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo32/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo33/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo34/stats/zstat1.nii.gz'], ['/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo35/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo36/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo37/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo38/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo39/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo40/stats/zstat1.nii.gz', '/Volumes/NewVolume/ds000114/working_dir/fmri/l2analysis/l2/_task_fingerfootlips/_pipeline_0/flameo/mapflow/_flameo41/stats/zstat1.nii.gz']]

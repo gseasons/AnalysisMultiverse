@@ -52,6 +52,10 @@ class analysis:
                                                   'p',
                                                   'connectivity',
                                                   'z_thresh',
+                                                  
+                                                  'warp_post_feat',
+                                                  'resting',
+                                                  
                                                   'index']), name='inputnode')
         
         
@@ -71,7 +75,9 @@ class analysis:
         
         l1 = level1(base_dir).construct()
         
-        norm = spatial_normalization(base_dir).construct()
+        #norm = spatial_normalization(base_dir)
+        #norm_get = norm.construct()
+        #norm_app = norm.construct()
         
         join_sub = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_sub', 
                                    joinsource='bids_dg', joinfield=['copes', 'varcopes', 'bold_warped'])
@@ -116,7 +122,7 @@ class analysis:
                                            ('mode_l2', 'inputnode.mode')]),
                           (ses_run, get_files, [('sessions', 'session'),
                                                 ('runs', 'run')]),
-                          (norm, join_sesrun, [('outnode.cope', 'copes'),
+                          (l1, join_sesrun, [('outnode.cope', 'copes'),
                                                ('outnode.varcope', 'varcopes'),
                                                ('outnode.bold', 'bold_warped')]),
                           (join_sesrun, l2, [('copes', 'inputnode.copes'),
@@ -138,7 +144,7 @@ class analysis:
             
             get_files = Node(Function(input_names=['session', 'task'],
                                       output_names=['query'], function=query), name='get_files')
-            
+            #PERHAPS CHANGE SO CAN RUN ON ONLY ONE SUBJECT OR SESSION
             join_ses = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_ses', 
                                    joinsource='ses', joinfield=['copes', 'varcopes', 'bold_warped'])
             
@@ -149,7 +155,7 @@ class analysis:
             fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
                                            ('mode_l2', 'inputnode.mode')]),
                           (ses, get_files, [('sessions', 'session')]),
-                          (norm, join_ses, [('outnode.cope', 'copes'),
+                          (l1, join_ses, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
                                             ('outnode.bold', 'bold_warped')]),
                           (join_ses, l2, [('copes', 'inputnode.copes'),
@@ -182,7 +188,7 @@ class analysis:
             fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
                                            ('mode_l2', 'inputnode.mode')]),
                           (run, get_files, [('runs', 'run')]),
-                          (norm, join_run, [('outnode.cope', 'copes'),
+                          (l1, join_run, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
                                             ('outnode.bold', 'bold_warped')]),
                           (join_run, l2, [('copes', 'inputnode.copes'),
@@ -202,7 +208,7 @@ class analysis:
             get_files = Node(Function(input_names=['task'],
                                       output_names=['query'], function=query), name='get_files')
             
-            fmri.connect([(norm, join_sub, [('outnode.cope', 'copes'),
+            fmri.connect([(l1, join_sub, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
                                             ('outnode.bold', 'bold_warped')]),
                           ])
@@ -229,7 +235,15 @@ class analysis:
                                         ('bins', 'inputnode.bins'),
                                         ('iso', 'inputnode.iso'),
                                         ('bbr', 'inputnode.bbr'),
-                                        ('susan', 'inputnode.susan')]),
+                                        ('susan', 'inputnode.susan'),
+                                        ('warp_post_feat', 'inputnode.warplater'),
+                                        ('mask', 'inputnode.mask')]),
+                      #(norm_get, pre, [('outnode.warp', 'inputnode.warp_file')]),
+                      
+                      #(pre, l1, [('outnode.invwarp', 'inputnode.invwarp'),
+                      #           ('outnode.warp_file', 'inputnode.warp')]),
+                      (task, l1, [('task', 'inputnode.task')]),
+                      
                       (inputnode, l1, [('discard', 'inputnode.discard'),
                                        ('HP', 'inputnode.HP'),
                                        ('film_thresh', 'inputnode.thresh'),
@@ -237,8 +251,14 @@ class analysis:
                                        ('base_switch', 'inputnode.base_switch'),
                                        ('gamma', 'inputnode.gamma'),
                                        ('dict_opt', 'inputnode.dict_opt'),
-                                       ('base_val', 'inputnode.base_val')]),
-                      (inputnode, norm, [('mask', 'inputnode.ref_file')]),
+                                       ('base_val', 'inputnode.base_val'),
+                                       ('resting', 'inputnode.resting'),
+                                       ('mask', 'inputnode.mask'),
+                                       ('warp_post_feat', 'inputnode.warp_post_feat')]),
+                      #(inputnode, norm_get, [('mask', 'inputnode.ref_file')]),
+                      #(inputnode, norm_app, [('mask', 'inputnode.ref_file')]),
+                      #(inputnode, norm_app, [('warp_post_feat', 'inputnode.needwarp')]),
+                      #(norm_get, norm_app, [('outnode.warp', 'inputnode.warp_file')]),
                       (inputnode, l2_split, [('mode_l2', 'inputnode.mode'),
                                              ('mask', 'inputnode.mask')]),
                       (inputnode, split, [('mask', 'inputnode.mask')]),
@@ -283,6 +303,8 @@ class analysis:
                     event_file = layout.get(task=task, session=ses.group(1), subject=sub, extension='.tsv')
                 elif run:
                     event_file = layout.get(task=task, run=run.group(1), subject=sub, extension='.tsv')
+            elif not len(event_file):
+                event_file = ['']
                 
             return event_file[0]
         
@@ -339,9 +361,12 @@ class analysis:
                       (events, l1, [('events', 'inputnode.event_file')]),
                       (pre, l1, [('outnode.smoothed', 'inputnode.smoothed'),
                                  ('outnode.outliers', 'inputnode.outliers'),
-                                 ('outnode.mc_par', 'inputnode.mc_par')]),
-                      (l1, norm, [('outnode.feat_dir', 'inputnode.feat_dir')]),
-                      (pre, norm, [('outnode.brain', 'inputnode.brain')]),
+                                 ('outnode.mc_par', 'inputnode.mc_par'),
+                                 ('outnode.brain', 'inputnode.brain'),
+                                 ('outnode.warp_file', 'inputnode.warp'),
+                                 ('outnode.invwarp', 'inputnode.invwarp')]),
+                      #(l1, norm_app, [('outnode.feat_dir', 'inputnode.feat_dir')]),
+                      #(pre, norm_get, [('outnode.brain', 'inputnode.brain')]),
                       (join_sub, l2_split, [('copes', 'inputnode.copes'),
                                             ('varcopes', 'inputnode.varcopes')]),
                       (l2_split, split, [('outnode.groups', 'inputnode.groups'),
