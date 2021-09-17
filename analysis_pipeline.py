@@ -16,64 +16,27 @@ class analysis:
         self.working_dir = working_dir
         self.data_dir = data_dir
         
-    def construct(self, subjects, tasks, sessions, runs, num_pipelines):
+    def construct(self, subjects, sessions, runs, pipeline_ind, preproc, spatial_norm, l1_v, l2_v, l3_v, corr):
         fmri = Workflow('fmri')
         base_dir = opj(self.exp_dir, self.working_dir)
         fmri.base_dir = base_dir
         
-        inputnode = Node(IdentityIterface(fields=['pipeline_names',
-                                                  'frac_mask',
-                                                  'discard',
-                                                  'dof_mc',
-                                                  'fwhm',
-                                                  'cost_mc',
-                                                  'bet_frac',
-                                                  'robust',
-                                                  'wm_thresh',
-                                                  'dof_f',
-                                                  'bbr_type',
-                                                  'interp',
-                                                  'cost',
-                                                  'bins',
-                                                  'iso',
-                                                  'bbr',
-                                                  'susan',
-                                                  'HP',
-                                                  'film_thresh',
-                                                  'serial_cor',
-                                                  'base_switch',
-                                                  'gamma',
-                                                  'dict_opt',
-                                                  'base_val',
-                                                  'mask',
-                                                  'mode_l2',
-                                                  'mode_l3',
-                                                  'method',
-                                                  'p',
-                                                  'connectivity',
-                                                  'z_thresh',
-                                                  
-                                                  'warp_post_feat',
-                                                  'resting',
-                                                  
-                                                  'index']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['mask', 'task']), name='inputnode')
+        inputnode.synchronize = True
         
         
         outnode = Node(IdentityInterface(fields=['TBD']), name='outnode')
         
-        iternode = Node(IdentityInterface(fields=['pipeline']), name='iternode')
-        iternode.iterables = [('pipeline', range(num_pipelines))]
-        
-        task = Node(IdentityInterface(fields=['task']), name='task')
-        task.iterables = [('task', tasks)]
+        #iternode = Node(IdentityInterface(fields=['pipeline']), name='iternode')
+        #iternode.iterables = [('pipeline', range(num_pipelines))]
         
         bids_dg = Node(BIDSDataGrabber(), name='bids_dg')
         bids_dg.inputs.base_dir = self.data_dir
         bids_dg.iterables = ('subject', subjects)
         
-        pre = preprocess(base_dir).construct()
+        pre = preprocess(base_dir).construct(preproc)
         
-        l1 = level1(base_dir).construct()
+        l1 = level1(base_dir).construct(l1_v, spatial_norm)
         
         #norm = spatial_normalization(base_dir)
         #norm_get = norm.construct()
@@ -82,18 +45,21 @@ class analysis:
         join_sub = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_sub', 
                                    joinsource='bids_dg', joinfield=['copes', 'varcopes', 'bold_warped'])
         
-        l2_split = level2(base_dir).construct(len(subjects))
+        l2_split = level2(base_dir).construct(len(subjects), l2_v)
         l2_split.inputs.inputnode.subjects = subjects
         l2_split.inputs.inputnode.split_half = True
-        split = split_half(base_dir).construct()
+        split = split_half(base_dir).construct(pipeline_ind)
         
-        l3 = level3(base_dir).construct()
+        l3 = level3(base_dir).construct(l3_v)
         l3.inputs.inputnode.subjects = subjects
         
-        correct = correction(base_dir).construct()
+        correct = correction(base_dir).construct(corr)
         
         def remove_container(file):
             return file[0]
+        
+        def ident(file):
+            return file
         
         #Probably replace session and run checks with MapNodes
         if sessions and runs:
@@ -114,12 +80,11 @@ class analysis:
             join_sesrun = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_sesrun', 
                                    joinsource='ses_run', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), '_fe')
+            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
-                                           ('mode_l2', 'inputnode.mode')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
                           (ses_run, get_files, [('sessions', 'session'),
                                                 ('runs', 'run')]),
                           (l1, join_sesrun, [('outnode.cope', 'copes'),
@@ -127,8 +92,8 @@ class analysis:
                                                ('outnode.bold', 'bold_warped')]),
                           (join_sesrun, l2, [('copes', 'inputnode.copes'),
                                              ('varcopes', 'inputnode.varcopes')]),
-                          (l2, join_sub, [(('outnode.copes', remove_container), 'copes'),
-                                          (('outnode.varcopes', remove_container), 'varcopes')]),
+                          (l2, join_sub, [(('outnode.copes', ident), 'copes'),
+                                          (('outnode.varcopes', ident), 'varcopes')]),
                           (join_sesrun, join_sub, [('bold_warped', 'bold_warped')]),
                           ])
         elif sessions:
@@ -148,20 +113,19 @@ class analysis:
             join_ses = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_ses', 
                                    joinsource='ses', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), '_fe')
+            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
-                                           ('mode_l2', 'inputnode.mode')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
                           (ses, get_files, [('sessions', 'session')]),
                           (l1, join_ses, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
                                             ('outnode.bold', 'bold_warped')]),
                           (join_ses, l2, [('copes', 'inputnode.copes'),
                                           ('varcopes', 'inputnode.varcopes')]),
-                          (l2, join_sub, [(('outnode.copes', remove_container), 'copes'),
-                                          (('outnode.varcopes', remove_container), 'varcopes')]),
+                          (l2, join_sub, [(('outnode.copes', ident), 'copes'),
+                                          (('outnode.varcopes', ident), 'varcopes')]),
                           (join_ses, join_sub, [('bold_warped', 'bold_warped')]),
                           ])
         elif runs:
@@ -181,20 +145,19 @@ class analysis:
             join_run = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_run', 
                                    joinsource='run', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), '_fe')
+            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
-                                           ('mode_l2', 'inputnode.mode')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
                           (run, get_files, [('runs', 'run')]),
                           (l1, join_run, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
                                             ('outnode.bold', 'bold_warped')]),
                           (join_run, l2, [('copes', 'inputnode.copes'),
                                           ('varcopes', 'inputnode.varcopes')]),
-                          (l2, join_sub, [(('outnode.copes', remove_container), 'copes'),
-                                          (('outnode.varcopes', remove_container), 'varcopes')]),
+                          (l2, join_sub, [(('outnode.copes', ident), 'copes'),
+                                          (('outnode.varcopes', ident), 'varcopes')]),
                           (join_run, join_sub, [('bold_warped', 'bold_warped')]),
                           ])
         else:
@@ -219,56 +182,56 @@ class analysis:
         #TR, event_file, mc_par, outliers, smoothed -> l1
         #covariate_frame
         
-        fmri.connect([(iternode, inputnode, [('pipeline', 'index')]),
-                      (inputnode, pre, [('frac_mask', 'inputnode.frac_mask'),
-                                        ('discard', 'inputnode.discard'),
-                                        ('dof_mc', 'inputnode.dof_mc'),
-                                        ('fwhm', 'inputnode.fwhm'),
-                                        ('cost_mc', 'inputnode.cost_mc'),
-                                        ('bet_frac', 'inputnode.bet_frac'),
-                                        ('robust', 'inputnode.robust'),
-                                        ('wm_thresh', 'inputnode.wm_thresh'),
-                                        ('dof_f', 'inputnode.dof_f'),
-                                        ('bbr_type', 'inputnode.bbr_type'),
-                                        ('interp', 'inputnode.interp'),
-                                        ('cost', 'inputnode.cost'),
-                                        ('bins', 'inputnode.bins'),
-                                        ('iso', 'inputnode.iso'),
-                                        ('bbr', 'inputnode.bbr'),
-                                        ('susan', 'inputnode.susan'),
-                                        ('warp_post_feat', 'inputnode.warplater'),
+        fmri.connect([#(iternode, inputnode, [('pipeline', 'index')]),
+                      (inputnode, pre, [#('frac_mask', 'inputnode.frac_mask'),
+                                        #('discard', 'inputnode.discard'),
+                                        #('dof_mc', 'inputnode.dof_mc'),
+                                        #('fwhm', 'inputnode.fwhm'),
+                                        #('cost_mc', 'inputnode.cost_mc'),
+                                        #('bet_frac', 'inputnode.bet_frac'),
+                                        #('robust', 'inputnode.robust'),
+                                        #('wm_thresh', 'inputnode.wm_thresh'),
+                                        #('dof_f', 'inputnode.dof_f'),
+                                        #('bbr_type', 'inputnode.bbr_type'),
+                                        #('interp', 'inputnode.interp'),
+                                        #('cost', 'inputnode.cost'),
+                                        #('bins', 'inputnode.bins'),
+                                        #('iso', 'inputnode.iso'),
+                                        #('bbr', 'inputnode.bbr'),
+                                        #('susan', 'inputnode.susan'),
+                                        #('warp_post_feat', 'inputnode.warplater'),
                                         ('mask', 'inputnode.mask')]),
                       #(norm_get, pre, [('outnode.warp', 'inputnode.warp_file')]),
                       
                       #(pre, l1, [('outnode.invwarp', 'inputnode.invwarp'),
                       #           ('outnode.warp_file', 'inputnode.warp')]),
-                      (task, l1, [('task', 'inputnode.task')]),
+                      (inputnode, l1, [('task', 'inputnode.task'),
+                                       ('mask', 'inputnode.mask')]),
                       
-                      (inputnode, l1, [('discard', 'inputnode.discard'),
-                                       ('HP', 'inputnode.HP'),
-                                       ('film_thresh', 'inputnode.thresh'),
-                                       ('serial_cor', 'inputnode.serial_cor'),
-                                       ('base_switch', 'inputnode.base_switch'),
-                                       ('gamma', 'inputnode.gamma'),
-                                       ('dict_opt', 'inputnode.dict_opt'),
-                                       ('base_val', 'inputnode.base_val'),
-                                       ('resting', 'inputnode.resting'),
-                                       ('mask', 'inputnode.mask'),
-                                       ('warp_post_feat', 'inputnode.warp_post_feat')]),
+                      #(inputnode, l1, [#('discard', 'inputnode.discard'),
+                                       #('HP', 'inputnode.HP'),
+                                       #('film_thresh', 'inputnode.thresh'),
+                                       #('serial_cor', 'inputnode.serial_cor'),
+                                       #('base_switch', 'inputnode.base_switch'),
+                                       #('gamma', 'inputnode.gamma'),
+                                       #('dict_opt', 'inputnode.dict_opt'),
+                                       #('base_val', 'inputnode.base_val'),
+                                       #('resting', 'inputnode.resting'),
+                                       #('mask', 'inputnode.mask'),
+                        #               ('warp_post_feat', 'inputnode.warp_post_feat')]),
                       #(inputnode, norm_get, [('mask', 'inputnode.ref_file')]),
                       #(inputnode, norm_app, [('mask', 'inputnode.ref_file')]),
                       #(inputnode, norm_app, [('warp_post_feat', 'inputnode.needwarp')]),
                       #(norm_get, norm_app, [('outnode.warp', 'inputnode.warp_file')]),
-                      (inputnode, l2_split, [('mode_l2', 'inputnode.mode'),
+                      (inputnode, l2_split, [#('mode_l2', 'inputnode.mode'),
                                              ('mask', 'inputnode.mask')]),
                       (inputnode, split, [('mask', 'inputnode.mask')]),
-                      (inputnode, l3, [('mask', 'inputnode.mask'),
-                                       ('mode_l3', 'inputnode.mode')]),
-                      (inputnode, correct, [('method', 'inputnode.method'),
-                                            ('p', 'inputnode.p'),
-                                            ('mask', 'inputnode.mask'),
-                                            ('connectivity', 'inputnode.connectivity'),
-                                            ('z_thresh', 'inputnode.z_thresh')]),
+                      (inputnode, l3, [('mask', 'inputnode.mask')]),
+                      (inputnode, correct, [#('method', 'inputnode.method'),
+                                            #('p', 'inputnode.p'),
+                                            ('mask', 'inputnode.mask')])
+                                            #('connectivity', 'inputnode.connectivity'),
+                                            #('z_thresh', 'inputnode.z_thresh')]),
                       ])
         
         
@@ -344,10 +307,10 @@ class analysis:
         find_bold = Node(Function(input_names=['files', 'task'],
                                   output_names=['file'], function=get_bold), name='find_bold')
         
-        join_task = JoinNode(IdentityInterface(fields=['score']), name='join_task', joinsource='task', joinfield=['score'])
+        #join_task = JoinNode(IdentityInterface(fields=['score']), name='join_task', joinsource='task', joinfield=['score'])
         
         
-        fmri.connect([(task, get_files, [('task', 'task')]),
+        fmri.connect([(inputnode, get_files, [('task', 'task')]),
                       (get_files, bids_dg, [('query', 'output_query')]),
                       #(bids_dg, find_bold, [('bold_files', 'files'),
                        #                     ('task', 'task')]),
@@ -363,8 +326,7 @@ class analysis:
                                  ('outnode.outliers', 'inputnode.outliers'),
                                  ('outnode.mc_par', 'inputnode.mc_par'),
                                  ('outnode.brain', 'inputnode.brain'),
-                                 ('outnode.warp_file', 'inputnode.warp'),
-                                 ('outnode.invwarp', 'inputnode.invwarp')]),
+                                 ('outnode.warp_file', 'inputnode.warp')]),
                       #(l1, norm_app, [('outnode.feat_dir', 'inputnode.feat_dir')]),
                       #(pre, norm_get, [('outnode.brain', 'inputnode.brain')]),
                       (join_sub, l2_split, [('copes', 'inputnode.copes'),
@@ -378,7 +340,7 @@ class analysis:
                                       ('varcopes', 'inputnode.varcopes')]),
                       (l3, correct, [('outnode.copes', 'inputnode.copes'),
                                         ('outnode.zstats', 'inputnode.zstat')]),
-                      (split, join_task, [('outnode.score', 'score')]),
+                      #(split, join_task, [('outnode.score', 'score')]),
                       ])
         
         return fmri

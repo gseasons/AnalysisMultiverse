@@ -52,6 +52,9 @@ def get_bright_thresh(medianval):
 def getthreshop(thresh):
     return '-thr %.10f -Tmin -bin' % (0.1 * thresh[1])
 
+def index(val, i):
+    return val[i]
+    
 def parse_xml(xml, goal, mask):
     import xml.etree.ElementTree as ET
     import re, os, glob
@@ -254,32 +257,51 @@ class spatial_normalization:
         genwarps.base_dir = os.getcwd() #self.base_dir
         
         inputnode = Node(IdentityInterface(fields=['brain', 'ref_file']), name='inputnode')
-        outnode = Node(IdentityInterface(fields=['warp', 'invwarp']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['warp']), name='outnode')
         
         prelim = Node(FLIRT(dof=12, output_type='NIFTI_GZ'), name='prelim')
         warp = Node(FNIRT(field_file=True), name='warp')
         
-        warp_inv = Node(InvWarp(), name='warp_inv')
+        #warp_inv = Node(InvWarp(), name='warp_inv')
         
         genwarps.connect([(inputnode, prelim, [('brain', 'in_file')]),
                           (inputnode, prelim, [('ref_file', 'reference')]),
                           (inputnode, warp, [('brain', 'in_file')]),
                           (inputnode, warp, [('ref_file', 'ref_file')]),
                           (prelim, warp, [('out_matrix_file', 'affine_file')]),
-                          (warp, warp_inv, [('field_file', 'warp')]),
-                          (inputnode, warp_inv, [('brain', 'reference')]),
+                          #(warp, warp_inv, [('field_file', 'warp')]),
+                          #(inputnode, warp_inv, [('brain', 'reference')]),
                           (warp, outnode, [('field_file', 'warp')]),
-                          (warp_inv, outnode, [('inverse_warp', 'invwarp')]),
+                          #(warp_inv, outnode, [('inverse_warp', 'invwarp')]),
                           ])
         
         return genwarps
         
-    def apply_warps(self):
+    def apply_warps(self, apply_var):
         appwarps = Workflow('appwarps')
         appwarps.base_dir = os.getcwd()
         
-        inputnode = Node(IdentityInterface(fields=['feat_dir', 'warp_file', 'ref_file', 'needwarp']), name='inputnode')
-        outnode = Node(IdentityInterface(fields=['cope', 'varcope', 'bold']), name='outnode')
+        apply_var = apply_var['apply']
+        
+        #inputnode = Node(IdentityInterface(fields=['feat_dir', 'warp_file', 'ref_file', 'needwarp']), name='inputnode')
+        
+        rng = len(apply_var['PIPELINE'][0][1])
+        
+        fields=['feat_dir', 'warp_file', 'ref_file', 'ind']
+        
+        fields += [key[0] for key in apply_var['WARP'] if key != 'PIPELINE']
+        
+        inputnode = Node(IdentityInterface(fields=fields), name='inputnode_app')
+        inputnode.iterables = apply_var['ind']
+        inputnode.synchronize = True
+        
+        for tup in apply_var['WARP']:
+            setattr(inputnode.inputs, tup[0], tup[1])
+        
+        if rng > 1:
+            outnode = JoinNode(IdentityInterface(fields=['cope', 'varcope', 'bold']), name='outnode', joinsource='inputnode_app', joinfield=['cope', 'varcope', 'bold'])
+        else:    
+            outnode = Node(IdentityInterface(fields=['cope', 'varcope', 'bold']), name='outnode')
         
         templates = {'cope': 'stats/cope*.nii.gz',
                      'varcope': 'stats/varcope*.nii.gz',
@@ -318,6 +340,19 @@ class spatial_normalization:
                 return bolds[0]
             else:
                 return bolds
+            
+        def buffer(feat_dir, needwarp, i, rng):
+            if rng > 1:
+                return feat_dir[i], needwarp[i]
+            else:
+                return feat_dir, needwarp
+        
+        buff = Node(Function(input_names=['feat_dir', 'needwarp', 'i', 'rng'],
+                             output_names=['feat_dir', 'needwarp'], function=buffer), name='buff')
+        buff.inputs.rng = rng
+        
+        def single_bold(bold):
+            return bold[0]
         
         applywarp_c = MapNode(ApplyWarp(), name='applywarp_c', iterfield=['in_file'])
         applywarp_v = MapNode(ApplyWarp(), name='applywarp_v', iterfield=['in_file'])
@@ -329,12 +364,15 @@ class spatial_normalization:
                           (inputnode, applywarp_c, [('warp_file', 'field_file')]),
                           (inputnode, applywarp_v, [('warp_file', 'field_file')]),
                           (inputnode, applywarp_bold, [('warp_file', 'field_file')]),
-                          (inputnode, selectfiles, [('feat_dir', 'base_directory')]),
-                          (inputnode, ret, [('needwarp', 'needwarp')]),
+                          (inputnode, buff, [('ind', 'i')]),
+                          (inputnode, buff, [('feat_dir', 'feat_dir')]),
+                          (buff, selectfiles, [('feat_dir', 'base_directory')]),
+                          (inputnode, buff, [('needwarp', 'needwarp')]),
+                          (buff, ret, [('needwarp', 'needwarp')]),
                           (selectfiles, ident, [('cope', 'cope')]),
                           (selectfiles, ident, [('varcope', 'varcope')]),
                           (selectfiles, ident, [('bold', 'bold')]),
-                          (inputnode, ident, [('needwarp', 'needwarp')]),
+                          (buff, ident, [('needwarp', 'needwarp')]),
                           (ident, applywarp_c, [('cope', 'in_file')]),
                           (ident, applywarp_v, [('varcope', 'in_file')]),
                           (ident, applywarp_bold, [(('bold', check_bold), 'in_file')]),
@@ -346,7 +384,7 @@ class spatial_normalization:
                           (selectfiles, ret, [('bold', 'bold_orig')]),
                           (ret, outnode, [('cope', 'cope')]),
                           (ret, outnode, [('varcope', 'varcope')]),
-                          (ret, outnode, [('bold', 'bold')]),
+                          (ret, outnode, [(('bold', single_bold), 'bold')]),
                           ])
         
         return appwarps
