@@ -44,9 +44,11 @@ from functions import spatial_normalization
 
 #PREPROCESSING
 class preprocess(spatial_normalization):
-    def __init__(self, base_dir):
+    def __init__(self, base_dir, task):
         super().__init__()
         self.base_dir = base_dir
+        self.task = task
+        self.pipeline = 0
         
     def construct(self, pre):
         preprocess = Workflow('preprocess')
@@ -56,7 +58,7 @@ class preprocess(spatial_normalization):
         
         outnode = Node(IdentityInterface(fields=['smoothed', 'outliers', 'plots', 'mc_par',
                                                  'warped_mean', 'warped', 'brain', 'reg_out_mat',
-                                                 'warp_file']), name='outnode')
+                                                 'warp_file', 'segmentations']), name='outnode')
         
         im = self.improcess_flow(pre)
         #reg = self.coreg_flow()
@@ -93,6 +95,7 @@ class preprocess(spatial_normalization):
                                             ('outnode.warped', 'warped'),
                                             ('outnode.brain', 'brain'),
                                             ('outnode.out_mat', 'reg_out_mat'),
+                                            ('outnode.segmentations', 'segmentations'),
                                             ('outnode.warp_file', 'warp_file')]),
                                             #('outnode.invwarp', 'invwarp')]),
                             ])
@@ -115,23 +118,23 @@ class preprocess(spatial_normalization):
                                                    'bet_frac', 'robust', 'wm_thresh', 'dof_f', 'bbr_type', 
                                                    'interp', 'cost', 'bins', 'iso', 'bbr',
                                                    'T1w', 'mean_img', 'slice_corrected',
-                                                   'mask', 'warplater']
+                                                   'mask', 'warplater', 'pipeline_names']
         
         
         #fields.append([key[0] for key in im_var if key != 'PIPELINE'])
         
         inputnode = Node(IdentityInterface(fields=fields, mandatory_inputs=False), name='inputnode_im')
-        inputnode.iterables = im_var['ExtractROI'] + im_var['smoother'] + co_var['BET'] + co_var['BET'] + co_var['registration']
+        inputnode.iterables = im_var['ExtractROI'] + im_var['smoother'] + co_var['BET'] + co_var['registration']
         inputnode.synchronize = True
         
         if rng > 1:
             outnode = JoinNode(IdentityInterface(fields=['mc_mean_img', 'slice_time_corrected', 
                                                  'smoothed', 'outliers', 'plots', 'mc_par',
-                                                 'warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'intermediate_outputs']), name='outnode', joinsource='inputnode_im', joinfield=['mc_mean_img', 'slice_time_corrected','smoothed', 'outliers', 'plots', 'mc_par', 'intermediate_outputs'])
+                                                 'warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'intermediate_outputs', 'segmentations']), name='outnode', joinsource='inputnode_im', joinfield=['mc_mean_img', 'slice_time_corrected','smoothed', 'outliers', 'plots', 'mc_par', 'intermediate_outputs', 'segmentations'])
         else:
             outnode = Node(IdentityInterface(fields=['mc_mean_img', 'slice_time_corrected', 
                                                  'smoothed', 'outliers', 'plots', 'mc_par',
-                                                 'warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'intermediate_outputs']), name='outnode')
+                                                 'warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'intermediate_outputs', 'segmentations']), name='outnode')
         
         reg = self.coreg_flow()
         
@@ -236,7 +239,8 @@ class preprocess(spatial_normalization):
                                             ('outnode.warped', 'warped'),
                                             ('outnode.brain', 'brain'),
                                             ('outnode.out_mat', 'out_mat'),
-                                            ('outnode.warp_file', 'warp_file')]),
+                                            ('outnode.warp_file', 'warp_file'),
+                                            ('outnode.segmentations', 'segmentations')]),
                            ])
         
         
@@ -261,16 +265,55 @@ class preprocess(spatial_normalization):
                            (smoothnode, outnode, [('smooth', 'smoothed'),
                                                   ('files', 'intermediate_outputs')]),
                            ])
+        
+        def out(base_dir, pipeline_st, task, st, sm, mc):
+            from nipype.interfaces import DataSink
+            from nipype import Node
+            import re, os
+            sink = Node(DataSink(base_directory=base_dir, parameterization=False), name='sink')
+            folder_name = task
+            session = re.search('/(_sessions_[A-Za-z0-9]+)/', sm)
+            run = re.search('/(_runs_[0-9]+)/', sm)
+            subject = re.search('/(_subject_[0-9A-Za-z]+/)', sm).group(1)
+            pipeline = re.search('/mapflow/[A-Za-z_]+([0-9]+)', os.getcwd()).group(1)
+            pipeline = 'pipeline_' + str(int(pipeline) + pipeline_st)
+            
+            sink.inputs.container = pipeline
+            
+            if session:
+                folder_name += '/' + session.group(1) + '/'
+            if run:
+                folder_name += '/' + run.group(1) + '/'
+            if folder_name == task:
+                folder_name += '/'
+                
+            folder_name += 'preprocess/' + subject
+            
+            setattr(sink.inputs, folder_name + '.@st', st)
+            setattr(sink.inputs, folder_name + '.@sm', sm)
+            setattr(sink.inputs, folder_name + '.@mc', mc)
+            
+            sink.run()
+        
+        write = MapNode(Function(input_names=['base_dir', 'pipeline_st', 'task', 'st', 'sm', 'mc'],
+                                 function=out), name='write', iterfield=['st', 'sm', 'mc'])
+        write.inputs.base_dir = self.base_dir
+        write.inputs.pipeline_st = self.pipeline
+        write.inputs.task = self.task
+        
+        imageproc.connect([(outnode, write, [('slice_time_corrected', 'st'),
+                                             ('mc_par', 'mc'),
+                                             ('smoothed', 'sm')
+                                             ]),
+                           ])
 
         return imageproc
-    
-    
-    
     
     #bet_frac=0.5, wm_thresh=0.5, dof_f=6, bbr=True, bbr_type='signed', interp='spline', iso=4, cost='mutualinfo', bins=640
     #robust=True
     def coreg_flow(self): #iso -> iso_resample
         #NOTE: this code is adapted from the nipype tutorial on preprocessing https://miykael.github.io/nipype_tutorial/notebooks/example_preprocessing.html 
+        from functions import get_wm
         coregwf = Workflow(name='coregwf')
         coregwf.base_dir = os.getcwd() #self.base_dir
         
@@ -290,12 +333,14 @@ class preprocess(spatial_normalization):
         
         #inputnode.inputs = co_var['BET'] + co_var['registration']
         
-        outnode = Node(IdentityInterface(fields=['warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'intermediate_outputs']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['warped_mean', 'warped', 'brain', 'out_mat', 'warp_file', 'segmentations', 'intermediate_outputs']), name='outnode')
          
         #Brain extraction (maybe frac is a parameter that can be adjusted, could alter -g vertical gradient intensity threshold)
         bet_anat = Node(BET(output_type='NIFTI_GZ'), name="bet_anat")#, iterfield='in_file')
         
-        def registration(base_dir, T1w, mean_img, slice_corrected, bet, bbr, wm_thresh, dof_f, bbr_type, interp, iso, cost, bins, warp_file, mask, warplater):
+        segment = Node(FAST(output_type='NIFTI_GZ'), name='segment')
+        
+        def registration(base_dir, T1w, mean_img, slice_corrected, bet, wm_file, bbr, wm_thresh, dof_f, bbr_type, interp, iso, cost, bins, warp_file, mask, warplater):
             from nipype.interfaces.fsl import (FAST, FLIRT, Threshold)
             from nipype import IdentityInterface
             from nipype import Workflow, Node, Function
@@ -310,11 +355,11 @@ class preprocess(spatial_normalization):
             #CHECK OPTIONS
             
             #MOVE SEGMENT OUTSIDE (SO INTERMEDIATES STORED), AND BBR SPECIFIC INTO BBR IF STATEMENT
-            segment = Node(FAST(in_files=bet, output_type='NIFTI_GZ'), name='segment')
+            #segment = Node(FAST(in_files=bet, output_type='NIFTI_GZ'), name='segment')
             
             #CHECK OPTIONS
             threshold = Node(Threshold(thresh=wm_thresh, args='-bin', output_type='NIFTI_GZ'), name="threshold")
-            
+            threshold.inputs.in_file = wm_file
             #FLIRT HAS BINS AS INPUT #cost=cost,
             reg_pre = Node(FLIRT(dof=dof_f, in_file=mean_img, reference=bet, output_type='NIFTI_GZ'), name='reg_pre')
             #bbr_type=bbr_type,
@@ -329,7 +374,7 @@ class preprocess(spatial_normalization):
             outnode =  Node(IdentityInterface(fields=['warped_mean', 'warped','out_mat']), name='outnode')
             
             if bbr:
-                reg.connect([(segment, threshold, [(('partial_volume_files', get_wm), 'in_file')]),
+                reg.connect([#(segment, threshold, [(('partial_volume_files', get_wm), 'in_file')]),
                              (threshold, reg_bbr, [('out_file', 'wm_seg')]),
                              (reg_pre, reg_bbr, [('out_matrix_file', 'in_matrix_file')]),
                              (reg_bbr, applywarp, [('out_matrix_file', 'in_matrix_file')]),
@@ -362,7 +407,7 @@ class preprocess(spatial_normalization):
             
             return out_mat, warped_mean, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
         
-        regnode = Node(Function(input_names=['base_dir', 'T1w', 'mean_img', 'slice_corrected', 'bet', 'bbr', 
+        regnode = Node(Function(input_names=['base_dir', 'T1w', 'mean_img', 'slice_corrected', 'bet', 'wm_file', 'bbr', 
                                              'wm_thresh', 'dof_f', 'bbr_type', 'interp', 'iso', 'cost', 'bins',
                                              'warp_file', 'mask', 'warplater'],
                                 output_names=['out_mat', 'warped_mean', 'warped', 'files'], 
@@ -404,13 +449,15 @@ class preprocess(spatial_normalization):
                          #(bet_anat, regnode, [('out_file', 'applywarp.reference')]),
                          #(bet_anat, regnode, [('out_file', 'applywarp_mean.reference')]),
                          #(bet_anat, segment, [('out_file', 'in_files')]),
-                         #(segment, regnode, [(('partial_volume_files', get_wm), 'wm_file')]),
+                         (bet_anat, segment, [('out_file', 'in_files')]),
+                         (segment, regnode, [(('partial_volume_files', get_wm), 'wm_file')]),
                          #OUTPUT
                          (regnode, outnode, [('out_mat', 'out_mat')]),
                          (regnode, outnode, [('warped_mean', 'warped_mean')]),
                          (regnode, outnode, [('warped', 'warped')]),
                          (regnode, outnode, [('files', 'intermediate_outputs')]),
                          (bet_anat, outnode, [('out_file', 'brain')]),
+                         (segment, outnode, [('partial_volume_files', 'segmentations')]),
                          ])
         
         return coregwf
@@ -419,6 +466,7 @@ class level1(spatial_normalization):
     def __init__(self, base_dir):
         super().__init__()
         self.base_dir = base_dir
+        #self.pipeline = 0
         
     def construct(self, l1_var, norm):
         level1 = Workflow('level1')
@@ -432,7 +480,7 @@ class level1(spatial_normalization):
                                                    
                                                    'task', 'mask', 'warp', 'brain',
                                                    
-                                                   'smoothed']), name='inputnode')
+                                                   'smoothed', 'segmentations']), name='inputnode')
         
         outnode = Node(IdentityInterface(fields=['feat_dir', 'contrast_names', 'cope', 'varcope', 'bold']), name='outnode')
         
@@ -461,6 +509,7 @@ class level1(spatial_normalization):
                                            #('resting', 'inputnode_l1.resting'),
                                            ('mask', 'inputnode_l1.mask'),
                                            ('warp', 'inputnode_l1.warp'),
+                                           ('segmentations', 'inputnode_l1.segmentations'),
                                            #('warp_post_feat', 'inputnode_l1.warp_post_feat'),
                                            ('brain', 'inputnode_l1.brain')]),
                         (featnode, outnode, [('outnode.feat_dir', 'feat_dir')]),
@@ -543,7 +592,7 @@ class level1(spatial_normalization):
         fields=['TR', 'discard', 'HP', 'thresh', 'serial_cor',
                                                    'base_switch', 'gamma', 'dict_opt', 'base_val',
                                                    'event_file', 'outliers', 'mc_par',
-                                                   'smoothed', 
+                                                   'smoothed', 'segmentations',
                                                    'task', 'resting', 'mask', 'warp', 'warp_post_feat', 'brain', 'ind']
         
         #fields.append([key[0] for key in l1_var['FLAMEO'] if key != 'PIPELINE'])
@@ -566,12 +615,14 @@ class level1(spatial_normalization):
         #MODIFY SO CAN CREATE SEED BASED OFF OF COORDINATES AND RADIUS
         #PASS IN CSF MASK AND GET SIGNAL FROM THERE TO ADD AS REGRESSOR
         #USE GLOBAL AVERAGE SIGNAL AS REGRESSOR AS WELL
-        def session_info(event_file, outliers, mc_par, TR, HP, smoothed, task, resting, mask, warp, warp_post_feat):
+        def session_info(event_file, outliers, mc_par, TR, HP, smoothed, task, resting, mask, warp, warp_post_feat, segmentations):
             from nipype import Node, Workflow, IdentityInterface
             from versatile import SpecifyModelVersatile
-            from nipype.interfaces.fsl import ImageMeants, ExtractROI, ImageMaths, ApplyWarp
+            from nipype.interfaces.fsl import ImageMeants, ExtractROI, ImageMaths, ApplyWarp, Threshold
+            from nipype.interfaces.fsl.maths import MathsCommand
             from functions import parse_xml
             import os, glob, re
+            import numpy as np
             
             model = Node(SpecifyModelVersatile(input_units='secs', parameter_source='FSL'), name='model')
             model.inputs.outlier_files = outliers
@@ -582,15 +633,30 @@ class level1(spatial_normalization):
                 
             if event_file:
                 model.inputs.bids_event_file = event_file
-            elif 'rest' in task:
-                file, index, name = parse_xml(resting['atlas'], resting['seed'], mask)
-                
-                get_seed = Node(ExtractROI(in_file=file, t_min=int(index), t_size=1), name='get_seed')
-                roi = get_seed.run().outputs.roi_file
-                
-                thr_seed = Node(ImageMaths(op_string='-thr {seed_thr} -bin'.format(seed_thr=resting['seed_thr'])), name='thr_seed')
-                thr_seed.inputs.in_file = roi
-                thr_file = thr_seed.run().outputs.out_file
+                session_info = model.run().outputs.session_info
+            elif 'rest' in task:#nipype.algorithms.misc PickAtlas(although i've kind of implemented this, might be nice to add multiple ROIs -> get user input for options and index them in GA, pass list of list)
+                if resting['atlas'] != 'ROI':
+                    file, index, name = parse_xml(resting['atlas'], resting['seed'], mask)
+                    
+                    get_seed = Node(ExtractROI(in_file=file, t_min=int(index), t_size=1), name='get_seed')
+                    roi = get_seed.run().outputs.roi_file
+                    
+                    thr_seed = Node(ImageMaths(op_string='-thr {seed_thr} -bin'.format(seed_thr=resting['seed_thr'])), name='thr_seed')
+                    thr_seed.inputs.in_file = roi
+                    thr_file = thr_seed.run().outputs.out_file
+                    suffix = ''.join([word[0] for word in name.split()])
+                else:
+                    create_seed = Node(MathsCommand(in_file=mask), name='create_seed')
+                    create_seed.inputs.args = '-mul 0 -add 1 -roi {x} 1 {y} 1 {z} 1 0 1'.format(x=resting['x'], y=resting['y'], z=resting['z'])
+                    seed = create_seed.run().outputs.out_file
+                    
+                    make_sphere = Node(MathsCommand(in_file=seed), name='make_sphere')
+                    make_sphere.inputs.args = '-kernel sphere {radius} -fmean'.format(radius=resting['radius'])
+                    
+                    thr_seed = Node(ImageMaths(op_string='-bin'), name='thr_seed')
+                    thr_seed.inputs.in_file = make_sphere.run().outputs.out_file
+                    thr_file = thr_seed.run().outputs.out_file
+                    suffix = '_x{x}_y{y}_z{z}_r{r}'.format(x=resting['x'], y=resting['y'], z=resting['z'], r=resting['radius'])
                 
                 smooth_mni = smoothed
                 
@@ -599,7 +665,7 @@ class level1(spatial_normalization):
                     mni.inputs.in_file = smoothed
                     smooth_mni = mni.run().outputs.out_file
                     
-                ev_name = re.search('task-([a-zA-Z]+)_', smooth_mni).group(1) + ''.join([word[0] for word in name.split()])
+                ev_name = re.search('task-([a-zA-Z]+)_', smooth_mni).group(1) + suffix
                     
                 mean_ts = Node(ImageMeants(in_file=smooth_mni, out_file=ev_name), name='mean_ts')
                     
@@ -607,16 +673,37 @@ class level1(spatial_normalization):
                 time_series = [mean_ts.run().outputs.out_file]
                 
                 model.inputs.event_files = time_series
+                session_info = model.run().outputs.session_info
                 
+                if resting['CSF']:
+                    ev_name = 'AvgCSFSig'
+                    threshold = Node(Threshold(thresh=resting['CSF_thresh'], args='-bin'), name='threshold')
+                    threshold.inputs.in_file = segmentations[0]
+                    
+                    mni_csf = Node(ApplyWarp(ref_file=mask, field_file=warp), name='mni')
+                    mni_csf.inputs.in_file = threshold.run().outputs.out_file
+                    csf_m = mni_csf.run().outputs.out_file
+                    
+                    mean_csf = Node(ImageMeants(in_file=smooth_mni, out_file=ev_name), name='mean_csf')
+                    
+                    mean_csf.inputs.mask = csf_m
+                    time_series = mean_csf.run().outputs.out_file
+                    
+                    session_info[0]['regress'].append({'name': ev_name, 'val': np.loadtxt(time_series, dtype=float)})
+                if resting['GLOBAL']:
+                    ev_name = 'AvgGlobalSig'
+                    mean_sig = Node(ImageMeants(in_file=smooth_mni, out_file=ev_name), name='mean_sig')
+                    
+                    mean_sig.inputs.mask = mask
+                    time_series = mean_sig.run().outputs.out_file
+                    session_info[0]['regress'].append({'name': ev_name, 'val': np.loadtxt(time_series, dtype=float)})
             else:
                 print('ERROR')
                 
-            session_info = model.run().outputs.session_info
-            
             return session_info
                     
         
-        modelspec = Node(Function(input_names=['event_file', 'outliers', 'mc_par', 'TR', 'HP', 'smoothed', 'task', 'resting', 'mask', 'warp', 'warp_post_feat', 'brain'],
+        modelspec = Node(Function(input_names=['event_file', 'outliers', 'mc_par', 'TR', 'HP', 'smoothed', 'task', 'resting', 'mask', 'warp', 'warp_post_feat', 'brain', 'segmentations'],
                                   output_names=['session_info'], function=session_info), name='modelspec')       
         
         #THIS MIGHT BREAK
@@ -701,14 +788,14 @@ class level1(spatial_normalization):
                              ])
         
         def buffer(outliers, mc_par, HP, smoothed, resting, warp_post_feat, discard, gamma, dict_opt, 
-                   base_val, base_switch, serial_cor, i, rng):
+                   base_val, base_switch, serial_cor, segmentations, i, rng):
             if rng > 1:
-                return outliers[i], mc_par[i], HP[i], smoothed[i], resting[i], warp_post_feat[i], discard[i], gamma[i], dict_opt[i], base_val[i], base_switch[i], serial_cor[i]
+                return outliers[i], mc_par[i], HP[i], smoothed[i], resting[i], warp_post_feat[i], discard[i], gamma[i], dict_opt[i], base_val[i], base_switch[i], serial_cor[i], segmentations[i]
             else:
-                return outliers, mc_par, HP, smoothed, resting, warp_post_feat, discard, gamma, dict_opt, base_val, base_switch, serial_cor
+                return outliers, mc_par, HP, smoothed, resting, warp_post_feat, discard, gamma, dict_opt, base_val, base_switch, serial_cor, segmentations
         
-        buff = Node(Function(input_names=['outliers', 'mc_par', 'HP', 'smoothed', 'resting', 'warp_post_feat', 'discard', 'gamma', 'dict_opt', 'base_val', 'base_switch', 'serial_cor', 'i', 'rng'],
-                             output_names=['outliers', 'mc_par', 'HP', 'smoothed', 'resting', 'warp_post_feat', 'discard', 'gamma', 'dict_opt', 'base_val', 'base_switch', 'serial_cor'], function=buffer), name='buff')
+        buff = Node(Function(input_names=['outliers', 'mc_par', 'HP', 'smoothed', 'resting', 'warp_post_feat', 'discard', 'gamma', 'dict_opt', 'base_val', 'base_switch', 'serial_cor', 'segmentations', 'i', 'rng'],
+                             output_names=['outliers', 'mc_par', 'HP', 'smoothed', 'resting', 'warp_post_feat', 'discard', 'gamma', 'dict_opt', 'base_val', 'base_switch', 'serial_cor', 'segmentations'], function=buffer), name='buff')
         buff.inputs.rng = rng
         
         l1_analysis.connect([(inputnode, buff, [('outliers', 'outliers'),
@@ -724,6 +811,7 @@ class level1(spatial_normalization):
                                                 ('base_val', 'base_val'),
                                                 ('base_switch', 'base_switch'),
                                                 ('serial_cor', 'serial_cor'),
+                                                ('segmentations', 'segmentations'),
                                                 ('ind', 'i')
                                                 ]),
                              ])
@@ -735,7 +823,8 @@ class level1(spatial_normalization):
                     (buff, modelspec, [('HP', 'HP')]), #
                     (buff, modelspec, [('smoothed', 'smoothed'),
                                        ('resting', 'resting'),
-                                       ('warp_post_feat', 'warp_post_feat')]), #
+                                       ('warp_post_feat', 'warp_post_feat'),
+                                       ('segmentations', 'segmentations')]), #
                     (inputnode, modelspec, [('task', 'task'),
                                             #('resting', 'resting'), #
                                             ('mask', 'mask'),
@@ -900,24 +989,28 @@ class level2:
         l2analysis = Workflow('l2analysis' + suffix)
         l2analysis.base_dir = os.getcwd() #self.base_dir
         
-        inputnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'mode', 'subjects', 'split_half', 'mask']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'mode', 'subjects', 'split_half', 'mask', 'max']), name='inputnode')
         outnode = Node(IdentityInterface(fields=['groups', 'copes', 'varcopes', 'flameo_stats', 'zstats']), name='outnode')
         
         groups = self.group_construction()
         
-        com = comb(num_sub, int(num_sub / 2))
-        if not com % 2:
-            num_groups = com
-        else:
-            num_groups = int(com / 2)
-            
+# =============================================================================
+#         com = comb(num_sub, int(num_sub / 2))
+#         if not com % 2:
+#             num_groups = com
+#         else:
+#             num_groups = int(com / 2)
+# =============================================================================
+        num_groups = num_sub #now the number of groups
+
         if suffix:
             num_groups = 1
         
         level2 = self.second_level_flow(num_groups, suffix, l2_var)
         
         l2analysis.connect([(inputnode, groups, [('subjects', 'inputnode.subjects'),
-                                                 ('split_half', 'inputnode.split_half')]),
+                                                 ('split_half', 'inputnode.split_half'),
+                                                 ('max', 'inputnode.max')]),
                             (inputnode, level2, [('copes', 'inputnode_l2'+suffix+'.copes'),
                                                  ('varcopes', 'inputnode_l2'+suffix+'.varcopes'),
                                                  #('mode', 'inputnode_l2.mode'),
@@ -939,24 +1032,29 @@ class level2:
         groups = Workflow('groups')
         groups.base_dir = os.getcwd() #self.base_dir
         
-        inputnode = Node(IdentityInterface(fields=['subjects', 'split_half']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['subjects', 'split_half', 'max']), name='inputnode')
         outnode = Node(IdentityInterface(fields=['groups']), name='outnode')
         
-        def make_groups(subjects, split_half):
-            import itertools
+        def make_groups(subjects, split_half, ref):
+            from functions import random_combination
+            from math import comb
             group_container = []
             if split_half:
-                prelim = list(itertools.combinations(subjects, round(len(subjects)/2)))
-                pre_len = len(prelim)
-                for i in range(pre_len):
-                    if not (pre_len % 2):
-                        if i == (pre_len/2):
-                            break
-                        else:
-                            group_container.append([list(prelim[i]), list(prelim[-(i+1)])])
-                    else:
-                        missed = [sub for sub in subjects if sub not in list(prelim[i])]
-                        group_container.append([missed, list(prelim[i])])
+                com = comb(len(subjects), int(len(subjects)/2))
+                if len(subjects) % 2:
+                    com /= 2
+                if com > ref:
+                    loops = ref
+                else:
+                    loops = com
+                
+                unique = set()
+                
+                while len(unique) < int(loops):
+                    group = random_combination(subjects)
+                    unique.add(group)
+                
+                group_container += [[list(tup[0]), list(tup[1])] for tup in list(unique)]
             else:
                 if type(subjects) == list:
                     group_container.append([subjects])
@@ -966,13 +1064,16 @@ class level2:
                 #PLACEHOLDER
             #    group_container.append([subjects, ['Single Group']])
             
+            #NOTE: SELECTED RANDOM GROUPS WON'T BE CONSISTENT ACROSS GENERATIONS -> SET A SEED?
+            #PROBABLY FINE HONESTLY
             return group_container
         
-        group = Node(Function(input_names=['subjects', 'split_half'],
+        group = Node(Function(input_names=['subjects', 'split_half', 'ref'],
                               output_names=['group_container'], function=make_groups), name='group')
         
         groups.connect([(inputnode, group, [('subjects', 'subjects'),
-                                            ('split_half', 'split_half')]),
+                                            ('split_half', 'split_half'),
+                                            ('max', 'ref')]),
                         (group, outnode, [('group_container', 'groups')]),
                         ])
         
@@ -1014,8 +1115,8 @@ class level2:
                     cont_v = []
                     cont_g = []
                     for i in range(contrasts):
-                        cont_c.append([cope[i] for cope in copes if re.search('_subject_([0-9]+)', cope[i]).group(1) in subset])
-                        cont_v.append([varcope[i] for varcope in varcopes if re.search('_subject_([0-9]+)', varcope[i]).group(1) in subset])
+                        cont_c.append([cope[i] for cope in copes if re.search('_subject_([0-9S]+)', cope[i]).group(1) in subset])
+                        cont_v.append([varcope[i] for varcope in varcopes if re.search('_subject_([0-9S]+)', varcope[i]).group(1) in subset])
                         cont_g.append(len(cont_v[i]))
                     
                     num_copes.append(cont_g)
@@ -1085,9 +1186,20 @@ class level2:
                         (re_varcope, outnode, [('out_file', 'var_copes')]),
                         (re_zstat, outnode, [('out_file', 'zstats')]),
                         ])
+            
+            def buffer(copes, varcopes, run_mode, i, rng):
+                if rng > 1:
+                    new_c = []
+                    new_v = []
+                    for j in range(len(copes)):
+                        new_c.append(copes[j][i])
+                        new_v.append(varcopes[j][i])
+                    return new_c, new_v, run_mode[i]
+                else:
+                    return copes, varcopes, run_mode
         else:
             iternode_l2 = Node(IdentityInterface(fields=['subgroup']), name='iternode_l2')
-            iternode_l2.iterables = [('subgroup', range(iternum))]
+            iternode_l2.iterables = [('subgroup', range(iternum*2))]
             cope_join = JoinNode(IdentityInterface(fields=['merged_file']), name='cope_join', joinsource='iternode_l2', joinfield='merged_file')
             var_join = JoinNode(IdentityInterface(fields=['merged_file']), name='var_join', joinsource='iternode_l2', joinfield='merged_file')
             
@@ -1099,16 +1211,16 @@ class level2:
                         ])
             
             
-        def buffer(copes, varcopes, run_mode, i, rng):
-            if rng > 1:
-                new_c = []
-                new_v = []
-                for j in range(len(copes)):
-                    new_c.append(copes[j][i])
-                    new_v.append(varcopes[j][i])
-                return new_c, new_v, run_mode[i]
-            else:
-                return copes, varcopes, run_mode
+            def buffer(copes, varcopes, run_mode, i, rng):
+                if rng > 1:
+                    new_c = []
+                    new_v = []
+                    for j in range(len(copes)):
+                        new_c.append(copes[j][i][0])
+                        new_v.append(varcopes[j][i][0])
+                    return new_c, new_v, run_mode[i]
+                else:
+                    return copes, varcopes, run_mode
         
         buff = Node(Function(input_names=['copes', 'varcopes', 'run_mode', 'i', 'rng'],
                              output_names=['copes', 'varcopes', 'run_mode'], function=buffer), name='buff')
@@ -1174,7 +1286,8 @@ class split_half:
                                           ('mask', 'inputnode_r.mask')]),
                        (inputnode, pred, [('groups', 'inputnode_p.groups'),
                                           ('preproc_bold', 'inputnode_p.preproc_bold'),
-                                          ('covariate_frame', 'inputnode_p.covariate_frame')]),
+                                          ('covariate_frame', 'inputnode_p.covariate_frame'),
+                                          ('mask', 'inputnode_p.mask')]),
                        (pred, dist, [('outnode.pred_mean', 'inputnode_d.P')]),
                        (stat, dist, [('outnode.repro_mean', 'inputnode_d.R')]),
                        (pred, outnode, [('outnode.pred', 'P_lst'),
@@ -1254,13 +1367,18 @@ class split_half:
         #FIGURE OUT HOW TO REPRESS ALL GRAPH OUTPUTS
         def compare(stats, mask):
             from nilearn.input_data import NiftiMasker
-            from nilearn.plotting import plot_img_comparison as plt
-            masker = NiftiMasker(mask)
+            from nilearn.image import math_img
+            from nilearn.plotting import plot_img_comparison as plot
+            import numpy as np
+            import matplotlib.pyplot as plt
+            plt.interactive(False)
+            masker = NiftiMasker(math_img('img > 0', img=mask))
             masker.fit()
             num_groups = int(len(stats)/2)
             out_stats = []
+            
             for i in range(num_groups):
-                out = plt(stats[2*i], stats[2*i+1], masker, plot_hist=False)
+                out = plot(stats[2*i], stats[2*i+1], masker, plot_hist=False)
                 out_stats += out
             
             return out_stats, np.mean(out_stats)
@@ -1283,7 +1401,7 @@ class split_half:
         reproducibility.connect([(inputnode, compare, [('mask', 'mask')]),
                                  (inputnode, buff, [('zstats', 'zstats'),
                                                     ('ind', 'i')]),
-                                 (buff, compare, [('zstats', 'zstats')]),
+                                 (buff, compare, [('zstats', 'stats')]),
                                  (compare, outnode, [('repro', 'repro'),
                                                      ('repro_mean', 'repro_mean')]),
                                  ])
@@ -1298,7 +1416,7 @@ class split_half:
         
         rng = len(num_pipelines[0][1])
         
-        fields = ['groups', 'preproc_bold', 'covariate_frame', 'ind']
+        fields = ['groups', 'preproc_bold', 'covariate_frame', 'mask', 'ind']
         inputnode = Node(IdentityInterface(fields=fields), name='inputnode_p')
         inputnode.iterables = num_pipelines
         inputnode.synchronize = True
@@ -1308,58 +1426,73 @@ class split_half:
         else:
             outnode = Node(IdentityInterface(fields=['pred', 'pred_mean']), name='outnode')
         
-        def predict(groups, covariate, bold):
+        def predict(groups, covariate, bold, mask):
             import re
-            from sklearn.svm import LinearSVC
+            from sklearn.ensemble import RandomForestClassifier
             from sklearn.multioutput import MultiOutputClassifier
             import pandas as pd
             import numpy as np
             import nibabel as nib
-            
             covariate = pd.read_table(covariate)
             covariates = covariate.set_index('participant_id')
             #covariates = covariate.columns
             num_cov = len(covariates.columns)
-            
+            #MAY NEED TO CHANGE SO THAT ADDITIONAL COLUMNS IN PARTICIPANTS ARE USED AS INPUTS AND ONLY DISEASE IS PREDICTED
             pred = []
+            #TEST SPEED ON OLD FORMAT AS WELL
+            mask_img = nib.load(mask)
+            mask_ind = np.nonzero(mask_img.get_fdata())
             
-            if num_cov:
-                svm = LinearSVC(random_state=0)
-                if num_cov > 1:
-                    clf = MultiOutputClassifier(svm)
-                else:
-                    clf = svm
+            t_size = nib.load(bold[0][0]).shape[-1]
+            
+            size = (int(np.ceil(np.ravel(bold).shape[0])), np.shape(mask_ind)[1]*t_size)
+            dat = np.zeros(size).astype(np.int16)
+            subs = []
+            ind = 0
+            for file_cont in bold:
+                for file in file_cont:
+                    sub = re.search('_subject_([0-9]+)', file).group(1)
+                    subs.append(sub)
+                    dat[ind, :] = nib.load(file).get_fdata()[mask_ind].reshape(1, -1)
+                    ind += 1
                     
+            if num_cov:
+                clf = RandomForestClassifier(random_state=2021, n_estimators=50)
+                #if num_cov > 1:
+                #    clf = MultiOutputClassifier(rfc)
+                #else:
+                #    clf = rfc
                 for group in groups:
                     X1 = group[0]
                     X2 = group[1]
-                    X1_im = []
                     y1 = []
-                    X2_im = []
                     y2 = []
-                    for file in bold:
-                        sub = re.search(file, '_subject_([0-9]+)').group(1)
-                        index = 'sub-' + sub
-                        if sub in X1:
-                            img = np.array(nib.load(file)).reshape(1, -1)
-                            X1_im.append(img)
-                            y1.append(covariates.loc[index].to_list())
-                        elif sub in X2:
-                            img = np.array(nib.load(file)).reshape(1, -1)
-                            X2_im.append(img)
-                            y2.append(covariates.loc[index].to_list())
-                        else:
-                            print("ERROR")
-                            
-                    Y1 = np.char.array(y1)
-                    Y2 = np.char.array(y2)
                     
-                    dat1 = np.array(X1_im)
-                    dat2 = np.array(X2_im)
+                    ind1 = []
+                    ind2 = []
+                    
+                    index = []
+                    for subgroup in group:
+                        for s in subgroup:
+                            index = 'sub-' + s
+                            group_ind = [pos for pos, val in enumerate(subs) if val == s]
+                            if s in X1:
+                                ind1 += group_ind
+                                y1.append(covariates.loc[index].to_list()*len(group_ind))
+                            elif s in X2:
+                                ind2 += group_ind
+                                y2.append(covariates.loc[index].to_list()*len(group_ind))
+                            
+                    Y1 = np.ravel(np.char.array(y1))
+                    Y2 = np.ravel(np.char.array(y2))
+                    
+                    dat1 = dat[tuple(ind1),...]
+                    dat2 = dat[tuple(ind2),...]
                     
                     clf = clf.fit(dat1, Y1)
                     pred.append(clf.score(dat2, Y2))
-                    
+    
+    
                     clf = clf.fit(dat2, Y2)
                     pred.append(clf.score(dat1, Y1))
             else:
@@ -1369,7 +1502,10 @@ class split_half:
         
         def buffer(bold, i, rng):
             if rng > 1:
-                return bold[i]
+                new_b = []
+                for j in range(len(bold)):
+                    new_b.append(bold[j][i])
+                return new_b
             else:
                 return bold
         
@@ -1377,11 +1513,12 @@ class split_half:
                              output_names=['bold'], function=buffer), name='buff')
         buff.inputs.rng = rng
         
-        predict = Node(Function(input_names=['groups', 'covariate', 'bold'],
+        predict = Node(Function(input_names=['groups', 'covariate', 'bold', 'mask'],
                              output_names=['pred', 'pred_mean'], function=predict), name='predict')
         
         pred.connect([(inputnode, predict, [('groups', 'groups'),
-                                            ('covariate_frame', 'covariate')]),
+                                            ('covariate_frame', 'covariate'),
+                                            ('mask', 'mask')]),
                       (inputnode, buff, [('preproc_bold', 'bold'),
                                            ('ind', 'i')]),
                       (buff, predict, [('bold', 'bold')]),
@@ -1438,12 +1575,14 @@ class level3:#(level2):
         #ASK ERIN ABOUT DEMEANING, ORTHOGONALIZATION
         def t_test(covariate, subjects):
             import pandas as pd
+            import numpy as np
+            from functions import find_orth
             #PROBABLY PASS IN COVARIATE AS FILE NAME
             covariate = pd.read_table(covariate)
             covariates = covariate.set_index('participant_id')
             covariates = covariates.loc[['sub-' + sub for sub in subjects]]
             categories = covariates.columns
-            groupcat = 'groups'
+            groupcat = 'group'
             EVs = {}
             contrasts = []
             
@@ -1473,14 +1612,24 @@ class level3:#(level2):
                 cov = covariates.drop(groupcat, axis=1)
                 cat = categories.drop(groupcat)
                 
+                #orthog = np.array(list(EVs.values())).T
+                EV_safe = EVs.copy()
+                
                 for c in cat:
                     labels = cov[c].unique()
-                    
-                    if type(labels[0]) == str:
-                        encode = labels.ngroup().to_list()
-                        EVs[c] = encode
-                    else:
-                        EVs[c] = cov[c].to_list()
+                    if len(EV_safe) > 1:
+                        for key in EV_safe:
+                            if type(labels[0]) == str:
+                                group = cov.groupby(c)
+                                encoded = group.ngroup().to_list()
+                                #orthog, vec = find_orth(orthog, np.array(encoded, ndmin=2).T)
+                                #EVs[c] = vec.tolist()
+                                EVs[c + '_' + key] = [encoded[i] if val else 0 for i, val in enumerate(EV_safe[key])]
+                            else:
+                                reg = cov[c].to_list()
+                                EVs[c + '_' + key] = [reg[i] if val else 0 for i, val in enumerate(EV_safe[key])]
+                                #orthog, vec = find_orth(orthog, np.array(cov[c].to_list(), ndmin=2).T)
+                                #EVs[c] = vec.tolist()
             else:
                 single_group = [1] * len(covariates.index)
                 label = 'group_mean'

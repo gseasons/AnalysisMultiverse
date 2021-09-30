@@ -1,0 +1,34 @@
+{
+    "groups": [
+        {
+            "name": "Group_00001",
+            "procs": [
+                0,
+                1
+            ],
+            "total": 2
+        }
+    ],
+    "links": [
+        {
+            "source": 0,
+            "target": 1,
+            "value": 1
+        }
+    ],
+    "maxN": 2,
+    "nodes": [
+        {
+            "group": 1,
+            "name": "0_p",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp6rftx4io/EGG/p/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp6rftx4io/EGG/p/result_p.pklz"
+        },
+        {
+            "group": 1,
+            "name": "1_p2",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp93t6hjl5/EGG/p2/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp93t6hjl5/EGG/p2/result_p2.pklz"
+        }
+    ]
+}

@@ -43,6 +43,9 @@ from nipype.interfaces.base import CommandLine
 from nipype.interfaces.fsl import Cluster, BinaryMaths, Threshold, SmoothEstimate
 import re
 
+import numpy as np
+from numpy.linalg import lstsq
+
 def get_wm(files):
     return files[-1]
 
@@ -80,6 +83,27 @@ def parse_xml(xml, goal, mask):
     
     else:
         print('ERROR')
+        
+def random_combination(iterable):
+    import random
+    out = []
+    n = len(iterable)
+    r = round(n / 2)
+    num = range(n)
+    
+    indices = sorted(random.sample(num, r))
+    group = [iterable[i] for i in indices]
+    out.append(tuple(group))
+    
+    out.append(tuple([sub for sub in iterable if sub not in group]))
+
+    return tuple(out)
+
+def find_orth(O, vec):
+    A = np.hstack((O, vec))
+    b = np.zeros(O.shape[1] + 1)
+    b[-1] = 1
+    return A, lstsq(A.T, b, rcond=None)[0]
 
 def FWE(base_dir, zstat, p, mask):
         #RETURNS CORRECTED ZSCORE IMAGE
@@ -216,24 +240,41 @@ def FDR(base_dir, zstat, p, mask):
             cmd = ('fdr -i {p_im} -m {mask} -q {q}')
             cl = CommandLine(cmd.format(p_im=p_im, mask=mask, q=q))
             results = cl.run().runtime.stdout
-            thresh = 1 - float(re.search('([0-9\.]+)', results).group(1))
+            thresh = 1 - float(re.search('(*[0-9\.]+)', results).group(1))
             
-            form = '-mul -1 -add 1 -thr {thresh} -mas {mask}'.format(thresh=thresh, mask=mask)
+            if re.search('(-)[0-9\.]+', results).group(1):
+                form = '-add 1 -thr {thresh} -mas {mask}'.format(thresh=thresh, mask=mask)
+            else:
+                form = '-mul -1 -add 1 -thr {thresh} -mas {mask}'.format(thresh=thresh, mask=mask)
             
             return form
         
-        form = MapNode(Function(input_names=['p_im', 'mask', 'q'],
-                               output_names=['form_str'], function=fdr), name='form', iterfield=['p_im'], nested=True)
+        form_pos = MapNode(Function(input_names=['p_im', 'mask', 'q'],
+                               output_names=['form_str'], function=fdr), name='form_pos', iterfield=['p_im'], nested=True)
         
+        form_neg = MapNode(Function(input_names=['p_im', 'mask', 'q'],
+                               output_names=['form_str'], function=fdr), name='form_neg', iterfield=['p_im'], nested=True)
+        
+        pos_thresh = MapNode(Threshold(direction='below'), name='pos_thresh', iterfield='in_file', nested=True)
+        pos_thresh.inputs.thresh = 0
+        neg_thresh = MapNode(Threshold(direction='above'), name='neg_thresh', iterfield='in_file', nested=True)
+        neg_thresh.inputs.thresh = 0
         
         corrected = MapNode(ImageMaths(suffix='_fdr'), name='corrected', iterfield=['in_file', 'op_string'], nested=True)
         
         FDR.connect([(inputnode, p_file, [('zstat', 'in_file')]),
-                     (inputnode, form, [('mask', 'mask'),
-                                        ('p', 'q')]),
-                     (p_file, form, [('out_file', 'p_im')]),
-                     (form, corrected, [('form_str', 'op_string')]),
-                     (p_file, corrected, [('out_file', 'in_file')]),
+                     (inputnode, form_pos, [('mask', 'mask'),
+                                            ('p', 'q')]),
+                     (inputnode, form_neg, [('mask', 'mask'),
+                                            ('p', 'q')]),
+                     (p_file, pos_thresh, [('out_file', 'in_file')]),
+                     (p_file, neg_thresh, [('out_file', 'in_file')]),
+                     (pos_thresh, form_pos, [('out_file', 'p_im')]),
+                     (neg_thresh, form_neg, [('out_file', 'p_im')]),
+                     (form_pos, corrected, [('form_str', 'op_string')]),
+                     (pos_thresh, corrected, [('out_file', 'in_file')]),
+                     (form_neg, corrected, [('form_str', 'op_string')]),
+                     (neg_thresh, corrected, [('out_file', 'in_file')]),
                      (corrected, outnode, [('out_file', 'corrected')])
                      ])
         

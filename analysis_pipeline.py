@@ -11,17 +11,18 @@ from iterface import IdentityIterface
 #SEND DESIRED INTERMEDIATES AND OUTPUTS TO DATASINK
 
 class analysis:
-    def __init__(self, exp_dir, working_dir, data_dir):
+    def __init__(self, exp_dir, working_dir, data_dir, out_dir):
         self.exp_dir = exp_dir
         self.working_dir = working_dir
         self.data_dir = data_dir
+        self.out_dir = out_dir
         
-    def construct(self, subjects, sessions, runs, pipeline_ind, preproc, spatial_norm, l1_v, l2_v, l3_v, corr):
+    def construct(self, subjects, sessions, runs, task, group_num, pipeline_ind, preproc, spatial_norm, l1_v, l2_v, l3_v, corr):
         fmri = Workflow('fmri')
         base_dir = opj(self.exp_dir, self.working_dir)
         fmri.base_dir = base_dir
         
-        inputnode = Node(IdentityInterface(fields=['mask', 'task']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['mask', 'task', 'max_groups']), name='inputnode')
         inputnode.synchronize = True
         
         
@@ -34,9 +35,9 @@ class analysis:
         bids_dg.inputs.base_dir = self.data_dir
         bids_dg.iterables = ('subject', subjects)
         
-        pre = preprocess(base_dir).construct(preproc)
+        pre = preprocess(self.out_dir, task).construct(preproc)
         
-        l1 = level1(base_dir).construct(l1_v, spatial_norm)
+        l1 = level1(self.out_dir).construct(l1_v, spatial_norm)
         
         #norm = spatial_normalization(base_dir)
         #norm_get = norm.construct()
@@ -45,20 +46,23 @@ class analysis:
         join_sub = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_sub', 
                                    joinsource='bids_dg', joinfield=['copes', 'varcopes', 'bold_warped'])
         
-        l2_split = level2(base_dir).construct(len(subjects), l2_v)
+        l2_split = level2(self.out_dir).construct(group_num, l2_v)
         l2_split.inputs.inputnode.subjects = subjects
         l2_split.inputs.inputnode.split_half = True
-        split = split_half(base_dir).construct(pipeline_ind)
+        split = split_half(self.out_dir).construct(pipeline_ind)
         
-        l3 = level3(base_dir).construct(l3_v)
+        l3 = level3(self.out_dir).construct(l3_v)
         l3.inputs.inputnode.subjects = subjects
         
-        correct = correction(base_dir).construct(corr)
+        correct = correction(self.out_dir).construct(corr)
         
         def remove_container(file):
             return file[0]
         
         def ident(file):
+            return file
+        
+        def fix_data_struct(file):
             return file
         
         #Probably replace session and run checks with MapNodes
@@ -68,8 +72,8 @@ class analysis:
                                  ('runs', runs)]
             
             def query(session, run, task):
-                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, session=session, run=run),
-                         'T1w_files': dict(datatype='anat', suffix='T1w', session=session),
+                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, session=session, run=run, extension=['.nii.gz', '.nii']),
+                         'T1w_files': dict(datatype='anat', suffix='T1w', session=session, extension=['.nii.gz', '.nii']),
                          }
                 return query
                 
@@ -80,11 +84,12 @@ class analysis:
             join_sesrun = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_sesrun', 
                                    joinsource='ses_run', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
+            l2 = level2(base_dir).construct(group_num, l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
+                                           ('max_groups', 'inputnode.max')]),
                           (ses_run, get_files, [('sessions', 'session'),
                                                 ('runs', 'run')]),
                           (l1, join_sesrun, [('outnode.cope', 'copes'),
@@ -101,8 +106,8 @@ class analysis:
             ses.iterables = [('sessions', sessions)]
             
             def query(session, task):
-                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, session=session),
-                         'T1w_files': dict(datatype='anat', suffix='T1w', session=session),
+                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, session=session, extension=['.nii.gz', '.nii']),
+                         'T1w_files': dict(datatype='anat', suffix='T1w', session=session, extension=['.nii.gz', '.nii']),
                          }
                 return query
                 
@@ -113,11 +118,12 @@ class analysis:
             join_ses = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_ses', 
                                    joinsource='ses', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
+            l2 = level2(base_dir).construct(group_num, l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
+                                           ('max_groups', 'inputnode.max')]),
                           (ses, get_files, [('sessions', 'session')]),
                           (l1, join_ses, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
@@ -133,8 +139,8 @@ class analysis:
             run.iterables = [('runs', runs)]
             
             def query(run, task):
-                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, run=run),
-                         'T1w_files': dict(datatype='anat', suffix='T1w'),
+                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, run=run, extension=['.nii.gz', '.nii']),
+                         'T1w_files': dict(datatype='anat', suffix='T1w', extension=['.nii.gz', '.nii']),
                          }
                 return query
                 
@@ -145,11 +151,12 @@ class analysis:
             join_run = JoinNode(IdentityInterface(fields=['copes', 'varcopes', 'bold_warped']), name='join_run', 
                                    joinsource='run', joinfield=['copes', 'varcopes', 'bold_warped'])
             
-            l2 = level2(base_dir).construct(len(subjects), l2_v, '_fe')
+            l2 = level2(base_dir).construct(group_num, l2_v, '_fe')
             l2.inputs.inputnode.subjects = subjects
             l2.inputs.inputnode.split_half = False
             
-            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask')]),
+            fmri.connect([(inputnode, l2, [('mask', 'inputnode.mask'),
+                                           ('max_groups', 'inputnode.max')]),
                           (run, get_files, [('runs', 'run')]),
                           (l1, join_run, [('outnode.cope', 'copes'),
                                             ('outnode.varcope', 'varcopes'),
@@ -162,18 +169,26 @@ class analysis:
                           ])
         else:
             def query(task):
-                query = {'bold_files': dict(datatype='func', suffix='bold', task=task),
-                         'T1w_files': dict(datatype='anat', suffix='T1w'),
+                query = {'bold_files': dict(datatype='func', suffix='bold', task=task, extension=['.nii.gz', '.nii']),
+                         'T1w_files': dict(datatype='anat', suffix='T1w', extension=['.nii.gz', '.nii']),
                          }
                 return query
                 
-            
+            def fix_data_struct(file):
+                files = []
+                if len(file) > 1:
+                    for pipeline in file:
+                        files.append([pipeline])
+                else:
+                    files = file
+                return files
+        
             get_files = Node(Function(input_names=['task'],
                                       output_names=['query'], function=query), name='get_files')
             
-            fmri.connect([(l1, join_sub, [('outnode.cope', 'copes'),
-                                            ('outnode.varcope', 'varcopes'),
-                                            ('outnode.bold', 'bold_warped')]),
+            fmri.connect([(l1, join_sub, [(('outnode.cope', fix_data_struct), 'copes'),
+                                            (('outnode.varcope', fix_data_struct), 'varcopes'),
+                                            (('outnode.bold', fix_data_struct), 'bold_warped')]),
                           ])
             
             
@@ -224,7 +239,8 @@ class analysis:
                       #(inputnode, norm_app, [('warp_post_feat', 'inputnode.needwarp')]),
                       #(norm_get, norm_app, [('outnode.warp', 'inputnode.warp_file')]),
                       (inputnode, l2_split, [#('mode_l2', 'inputnode.mode'),
-                                             ('mask', 'inputnode.mask')]),
+                                             ('mask', 'inputnode.mask'),
+                                             ('max_groups', 'inputnode.max')]),
                       (inputnode, split, [('mask', 'inputnode.mask')]),
                       (inputnode, l3, [('mask', 'inputnode.mask')]),
                       (inputnode, correct, [#('method', 'inputnode.method'),
@@ -253,10 +269,14 @@ class analysis:
             layout = BIDSLayout(data)
             
             task = re.search('task-([0-9A-Za-z]+)_bold', file).group(1)
+            
+            if 'rest' in task:
+                return ''
+            
             event_file = layout.get(task=task, extension='.tsv')
             
             if len(event_file) > 1:
-                sub = re.search('/sub-([0-9]+)/', file).group(1)
+                sub = re.search('/sub-([0-9A-Za-z]+)/', file).group(1)
                 ses = re.search('_ses-([A-Za-z]+)_task', file)
                 run = re.search('run-([0-9]+)', file)
                 
@@ -326,7 +346,8 @@ class analysis:
                                  ('outnode.outliers', 'inputnode.outliers'),
                                  ('outnode.mc_par', 'inputnode.mc_par'),
                                  ('outnode.brain', 'inputnode.brain'),
-                                 ('outnode.warp_file', 'inputnode.warp')]),
+                                 ('outnode.warp_file', 'inputnode.warp'),
+                                 ('outnode.segmentations', 'inputnode.segmentations')]),
                       #(l1, norm_app, [('outnode.feat_dir', 'inputnode.feat_dir')]),
                       #(pre, norm_get, [('outnode.brain', 'inputnode.brain')]),
                       (join_sub, l2_split, [('copes', 'inputnode.copes'),

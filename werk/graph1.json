@@ -1,0 +1,99 @@
+{
+    "groups": [
+        {
+            "name": "Group_00001",
+            "procs": [
+                0
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00002",
+            "procs": [
+                1
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00003",
+            "procs": [
+                2
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00004",
+            "procs": [
+                3
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00005",
+            "procs": [
+                4
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00006",
+            "procs": [
+                5
+            ],
+            "total": 1
+        },
+        {
+            "name": "Group_00007",
+            "procs": [
+                6
+            ],
+            "total": 1
+        }
+    ],
+    "links": [],
+    "maxN": 1,
+    "nodes": [
+        {
+            "group": 1,
+            "name": "0_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpwi_wz646/werk/_iter_0/_dum_1/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpwi_wz646/werk/_iter_0/_dum_1/f/result_f.pklz"
+        },
+        {
+            "group": 2,
+            "name": "1_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp8c0ujyto/werk/_iter_0/_dum_2/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp8c0ujyto/werk/_iter_0/_dum_2/f/result_f.pklz"
+        },
+        {
+            "group": 3,
+            "name": "2_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpjtrnb3s0/werk/_iter_1/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpjtrnb3s0/werk/_iter_1/f/result_f.pklz"
+        },
+        {
+            "group": 4,
+            "name": "3_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp296zm9di/werk/_iter_0/_dum_1/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp296zm9di/werk/_iter_0/_dum_1/f/result_f.pklz"
+        },
+        {
+            "group": 5,
+            "name": "4_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp__qkk9t2/werk/_iter_0/_dum_2/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp__qkk9t2/werk/_iter_0/_dum_2/f/result_f.pklz"
+        },
+        {
+            "group": 6,
+            "name": "5_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpx4dgyy3g/werk/_iter_0/_dum_1/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmpx4dgyy3g/werk/_iter_0/_dum_1/f/result_f.pklz"
+        },
+        {
+            "group": 7,
+            "name": "6_f",
+            "report": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp5r5c6bag/werk/_iter_0/_dum_2/f/_report/report.rst",
+            "result": "/private/var/folders/mx/mztbckq95hzc7px9341hsc480000gn/T/tmp5r5c6bag/werk/_iter_0/_dum_2/f/result_f.pklz"
+        }
+    ]
+}
