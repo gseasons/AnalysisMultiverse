@@ -674,7 +674,7 @@ class level1(spatial_normalization):
                 
                 model.inputs.event_files = time_series
                 session_info = model.run().outputs.session_info
-                
+                #THIS IS MISSING A THRESHOLD FOR WHAT QUANTIFIES CSF
                 if resting['CSF']:
                     ev_name = 'AvgCSFSig'
                     threshold = Node(Threshold(thresh=resting['CSF_thresh'], args='-bin'), name='threshold')

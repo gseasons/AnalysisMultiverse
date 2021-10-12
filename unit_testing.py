@@ -5,32 +5,71 @@ Created on Wed Aug 11 11:48:57 2021
 
 @author: grahamseasons
 """
+from niworkflows.anat.ants import init_brain_extraction_wf
+#wf = init_brain_extraction_wf()
+#wf.inputs.inputnode.in_files = '/Volumes/NewVolume/super_agers/sub-002S6009/anat/sub-002S6009_T1w.nii.gz'
+#wf.run()
 
 from nipype.algorithms.modelgen import orth
 import numpy as np
 from numpy.linalg import lstsq
 from scipy.linalg import orth
-
-from nipype import Node, Workflow, IdentityInterface, Function
+import os
+from nipype import Node, Workflow, IdentityInterface, Function, JoinNode
 #from nipype.interaces import IdentityInterface
 
 
+# =============================================================================
 werk = Workflow('werk')
+werk.base_dir = os.getcwd()
 ident = Node(IdentityInterface(fields=['iter']), name='ident')
-ident.iterables = ('iter', [0,0,1,0])
+ident.iterables = [('iter', [0,4])]
+# =============================================================================
 
 def printer(inp):
     print(inp)
+    
+def ret(inp):
+    A = ['A', 'B', 'C', 'D', 'E']
+    return A[inp]
 
-ident2 = Node(IdentityInterface(fields=['dum']), name='ident2')
+def printer2(inp, inp2):
+    print(inp)
+    print(inp2)
+
+test = Node(IdentityInterface(fields=['func_str']), name='test')
+test.inputs.func_str = 'def printer(inp):\n print(inp)'
+
+# =============================================================================
+ident2 = Node(IdentityInterface(fields=['dum', 'iter']), name='ident2')
 ident2.itersource = ('ident', 'iter')
-ident2.iterables = [('dum', {0:[1,2]})]
+ident2.iterables = [('dum', {0:[1,2], 4:[4]})]
+# =============================================================================
 
 f = Node(Function(input_names='inp', function=printer), name='f')
-werk.connect([(ident, ident2, [('iter', 'dum')]),
-              (ident2, f, [('dum', 'inp')])])
+f2 = Node(Function(input_names='inp', function=printer), name='f2')
+f3 = Node(Function(input_names='inp', output_names='inp', function=ret), name='f3')
+f4 = Node(Function(input_names='inp', function=printer2), name='f4')
+#f.iterables = [('inp', {0: {1: [2,3], 4: [5,6]}})]
+join = Node(IdentityInterface(fields=['dum', 'egg']), name='join')#, joinsource='ident2', joinfield=['dum', 'egg'])
+join2 = JoinNode(IdentityInterface(fields=['dum', 'egg']), name='join2', joinsource='ident', joinfield=['dum', 'egg'])
+# =============================================================================
+werk.connect([#(test, ident, [('func_str', 'function_str')]),
+              #(test, ident2, [('func_str', 'function_str')]),
+              (ident, f2, [('iter', 'inp')]),
+              (ident, ident2, [('iter', 'iter')]),
+               (ident2, f, [('dum', 'inp')]),
+               (ident2, join, [('dum', 'dum')]),
+               (ident, f3, [('iter', 'inp')]),
+               (f3, join, [('inp', 'egg')]),
+               (join, join2, [('dum', 'dum'),
+                              ('egg', 'egg')]),
+               (join2, f4, [('dum', 'inp'),
+                            ('egg', 'inp2')]),
+               ])
+# =============================================================================
 
-#werk.run()
+werk.run()
 
 def construction(groups, copes, varcopes):
             import re

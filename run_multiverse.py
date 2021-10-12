@@ -13,20 +13,21 @@ import os
 import numpy as np
 from collections import Counter
 
-def define_paths(container, dictionary, indexes=[0]):
+def define_paths(container, dictionary, indexes):
     #keys, values = zip(*dictionary.items())
     #will probably change this into comparing hashes of dictionaries or something: 
         #https://www.doc.ic.ac.uk/~nuric/coding/how-to-hash-a-dictionary-in-python.html
     out_dic = {}
+    link = {}
     old_x = len(indexes)
-    if old_x > 1:
+    if old_x >= 1:
         old_x -= 1
-        
+    change = len(indexes) - 1
     for i, vals in enumerate(indexes):
         if isinstance(vals, np.ndarray):
             out_dic[i] = {'id': vals}
         else:
-            out_dic[i] = {}
+            out_dic[i] = {'id': np.array(range(vals))}
     out_dic['const'] = {}
     for i, key in enumerate(dictionary):
         if type(dictionary[key]) == list and key != 'PIPELINE':
@@ -56,7 +57,7 @@ def define_paths(container, dictionary, indexes=[0]):
                             index_ = ind
                             gen = np.unique(tup[1])
                             for k in out_dic:
-                                if k == 'const':
+                                if type(k) != int:#'const':
                                     break
                                 if len(gen) == 1:
                                     if key not in out_dic['const']:
@@ -81,27 +82,30 @@ def define_paths(container, dictionary, indexes=[0]):
                                         out_dic[k][j]['id'] = [-1]
                                         
                                     if not np.array_equiv(out_dic[k][j]['id'], x):
-                                        if 'id' in out_dic[k]:
-                                            if not np.array_equiv(out_dic[k][j]['id'], [-1]) or (min(x) == min(out_dic[k]['id']) and len(x) < len(out_dic[k]['id'])):
-                                                cx = Counter(out_dic[k]['id'])
-                                                cid = Counter(x)
-                                                out = min(sorted((cx - cid).elements()))
-                                                link = {out: {j: [key, subkey]}}
-                                        elif not np.array_equiv(out_dic[k][j]['id'], [-1]):
+                                        if not np.array_equiv(out_dic[k][j]['id'], [-1]):
                                             cx = Counter(out_dic[k][j]['id'])
                                             cid = Counter(x)
                                             out = min(sorted((cx - cid).elements()))
                                             link = {out: {j: [key, subkey]}}
+                                        elif 'id' in out_dic[k]:
+                                            if not np.array_equiv(out_dic[k][j]['id'], [-1]) or (min(x) == min(out_dic[k]['id']) and len(x) < len(out_dic[k]['id'])):
+                                                #cx = Counter(out_dic[k]['id'])
+                                                #cid = Counter(x)
+                                                #out = min(sorted((cx - cid).elements()))
+                                                for out in out_dic[k]['id']:
+                                                    link[out] = {j: [key, subkey]}
+                                                #link = {out: {j: [key, subkey]}}
                                     
                                     if j > old_x:
                                         out_dic[k][j]['link'] = link[j]
                                     
                                     out_dic[k][j]['id'] = x
                                     out_dic[k][j][key][subkey][tup[0]] = tup[1][j]
-                                if k == list(out_dic.keys())[-2]:
+                                if k == change:#list(out_dic.keys())[-2]:
                                     old_x = j
                                 
-                            link = []
+                            link = {}
+                            out_dic[subkey + '_' + tup[0]] = tup[1]
                     
     un, ind = np.unique(container, return_inverse=True, axis=1)
     index = [np.where((un[:,i].reshape(-1,1) == container).sum(axis=0) == container.shape[0])[0] for i in range(un.shape[1])]
@@ -197,7 +201,7 @@ def main():
                                 'PIPELINE': [('pipeline_names', pipeline_names)],
                                 }
             
-            container, ind, out_dic, index_ = define_paths(container, preproc)
+            container, ind, out_dic, index_ = define_paths(container, preproc, [num_pipelines+2])
             container, ind, out_dic, index_ = define_paths(container, egg, index_)
             
             spatial_norm['get'] = {}
