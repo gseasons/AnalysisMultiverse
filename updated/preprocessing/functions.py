@@ -6,6 +6,8 @@ Created on Mon Oct  4 10:28:41 2021
 @author: grahamseasons
 """
 from nipype.utils.functions import getsource
+from updated.functions import insert
+from updated.workflows import write_out
 import re
 
 def get_bright_thresh(medianval):
@@ -14,25 +16,50 @@ def get_bright_thresh(medianval):
 def getthreshop(thresh):
     return '-thr %.10f -Tmin -bin' % (0.1 * thresh[1])
 
-def insert(string, ind, new):
-    return string[:ind] + new + string[ind:]
-
 def get_wm(files):
     return files[-1]
 
-def decision(mc_mean, mc, st, slice_correct, mean_vol):
-    if mean_vol and slice_correct:
-        return mc_mean, st
-    elif mean_vol:
-        return mc_mean, mc
+def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
+    from nipype import Node
+    from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT
+    import nibabel as nib
+    resample = False
+    if nib.load(mc).shape[0:-1] != nib.load(mask).shape:
+        resample = True
+        
+    mask = Threshold(in_file=mask, thresh=0, command='-bin').run().outputs.out_file
+    if mc_mean and slice_correct:
+        if resample:
+            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True).run().outputs.out_file
+        return mean_vol, st, mask
+    elif mc_mean:
+        if resample:
+            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True).run().outputs.out_file
+        return mean_vol, mc, mask
     elif slice_correct:
-        return mc, st
+        size = nib.load(mc).shape
+        get_mid = Node(ExtractROI(t_min=round(size[-1]/2), t_size=1), name='get_mid')
+        mc_m = get_mid.run().outputs.roi_file
+        if resample:
+            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True).run().outputs.out_file
+        return mc_m, st, mask
     else:
-        return mc, mc
+        size = nib.load(mc).shape
+        get_mid = Node(ExtractROI(t_min=round(size[-1]/2), t_size=1), name='get_mid')
+        mc_m = get_mid.run().outputs.roi_file
+        if resample:
+            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True).run().outputs.out_file
+        return mc_m, mc, mask
+    
+def strip_container(in_file):
+    if type(in_file) == list:
+        return in_file[0]
+    else:
+        return in_file
 
 def function_str(name, dic=''):   
-    from updated.preprocessing.workflows import registration, smooth
-    valid_functions = ['registration', 'smooth']
+    from updated.preprocessing.workflows import registration, smooth, regress, toMNI
+    valid_functions = ['registration', 'smooth', 'regress', 'toMNI']
     if name in valid_functions:
         func_str = getsource(vars()[name])
         try: 
@@ -44,45 +71,25 @@ def function_str(name, dic=''):
             params = ', ' + ', '.join(out)
             func_str = insert(func_str, ind, params)
             out = [element for element in out if '_' in element]
-                
-            for search in reversed(list(re.finditer('\n(\n)(\s+)[A-Za-z]+.run()', func_str))):
+            
+            workflowfind = list(re.finditer('\n(\n)(\s+)[A-Za-z]+.run()', func_str))
+            if not workflowfind:
+                workflowfind = list(re.finditer('\n(\n)(\s+)[A-Za-z\s=]+.run()', func_str))
+            
+            for search in reversed(workflowfind):
                 ind = search.start(1)
                 block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["for param in {params}:\n",
                 "search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)\n",
-                "setattr(vars[search.group(1)].inputs, search.group(2), vars()[param])\n"])
+                "setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])\n"])
                 
                 func_str = insert(func_str, ind, block).format(params=out)
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
         except:
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
         
-def out(base_dir, pipeline_st, task, param_dic, slicetiming, smooth, mc_par, mc_img, mc_mean, brain, outliers, plots, out_mat, warped, segment, warp_file):
-    outputs = list(locals().keys())[3:]
-    from nipype.interfaces import DataSink
-    from nipype import Node
-    import re, os
-    sink = Node(DataSink(base_directory=base_dir, parameterization=False), name='sink')
-    folder_name = task
-    session = re.search('/(_sessions_[A-Za-z0-9]+)/', vars()[outputs[0]])
-    run = re.search('/(_runs_[0-9]+)/', vars()[outputs[0]])
-    subject = re.search('/(_subject_[0-9A-Za-z]+/)', vars()[outputs[0]]).group(1)
-    pipeline = re.search('/mapflow/[A-Za-z_]+([0-9]+)', os.getcwd()).group(1)
-    pipeline = 'pipeline_' + str(int(pipeline) + pipeline_st)
-    
-    sink.inputs.container = pipeline
-    
-    if session:
-        folder_name += '/' + session.group(1) + '/'
-    if run:
-        folder_name += '/' + run.group(1) + '/'
-    if folder_name == task:
-        folder_name += '/'
-            
-    folder_name += 'preprocess/' + subject
-    
-    outputs = []
-    
-    for i, out in enumerate(outputs):
-        setattr(sink.inputs, folder_name + '.@' + str(i), vars()[out])
-            
-    sink.run()
+def get_sink(inputs):
+    func_str = getsource(write_out)
+    ind = func_str.find('):')
+    params = ', ' + ', '.join(inputs)
+    func_str = insert(func_str, ind, params)
+    return func_str

@@ -1,0 +1,168 @@
+[
+    {
+        "group": 1,
+        "imports": [],
+        "name": "00_get_dummy",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "00_get_dummy"
+        ],
+        "name": "01_calc_dummy_scans",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [],
+        "name": "02_val_bold",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "02_val_bold",
+            "00_get_dummy"
+        ],
+        "name": "03_gen_avg",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "03_gen_avg"
+        ],
+        "name": "04_init_aff",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "04_init_aff",
+            "03_gen_avg"
+        ],
+        "name": "05_norm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "05_norm",
+            "03_gen_avg"
+        ],
+        "name": "06_map_brainmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "06_map_brainmask"
+        ],
+        "name": "07_binarize_mask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "07_binarize_mask"
+        ],
+        "name": "08_pre_mask_dilate",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "08_pre_mask_dilate",
+            "03_gen_avg"
+        ],
+        "name": "09_check_hdr",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "09_check_hdr",
+            "03_gen_avg"
+        ],
+        "name": "10_n4_correct",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "10_n4_correct"
+        ],
+        "name": "11_skullstrip_first_pass",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "11_skullstrip_first_pass"
+        ],
+        "name": "12_skullstrip_first_dilate",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "11_skullstrip_first_pass",
+            "12_skullstrip_first_dilate"
+        ],
+        "name": "13_skullstrip_first_mask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "13_skullstrip_first_mask"
+        ],
+        "name": "14_unifize",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "14_unifize",
+            "03_gen_avg"
+        ],
+        "name": "15_fixhdr_unifize",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "15_fixhdr_unifize"
+        ],
+        "name": "16_skullstrip_second_pass",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "16_skullstrip_second_pass",
+            "03_gen_avg"
+        ],
+        "name": "17_fixhdr_skullstrip2",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "17_fixhdr_skullstrip2",
+            "11_skullstrip_first_pass"
+        ],
+        "name": "18_combine_masks",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "15_fixhdr_unifize",
+            "18_combine_masks"
+        ],
+        "name": "19_apply_mask",
+        "size": 1
+    }
+]

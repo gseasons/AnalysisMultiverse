@@ -9,6 +9,9 @@ from nipype import Workflow, Node, JoinNode, IdentityInterface, Function
 from nipype.interfaces.io import BIDSDataGrabber
 from os.path import join as opj
 from updated.preprocessing.preprocess import preprocess
+from updated.l1_analysis.analyze import level1
+from updated.functions import traverse
+
 class analysis:
     def __init__(self, exp_dir, working_dir, data_dir, out_dir):
         self.exp_dir = exp_dir
@@ -16,7 +19,7 @@ class analysis:
         self.data_dir = data_dir
         self.out_dir = out_dir
         
-    def construct(self, subjects, sessions, runs, task, pipeline, preproc, dynamic):
+    def construct(self, subjects, sessions, runs, task, pipeline, master, dynamic):
         fmri = Workflow('fmri')
         base_dir = opj(self.exp_dir, self.working_dir)
         fmri.base_dir = base_dir
@@ -37,7 +40,14 @@ class analysis:
         bids_dg.iterables = ('subject', subjects)
         
         pre = preprocess(task, pipeline, self.out_dir)
-        pre = pre.construct(preproc, dynamic)
+        pre = pre.construct(dynamic)
+        
+        l1 = level1(task, pipeline, self.out_dir, networks=1)
+        l1 = l1.construct(dynamic)
+        #ADD ALL OTHER NODES HERE TOO
+        #MAKE CONNECTIONS ONCE VERIFY TRAVERSE WORKING AS EXPECTED FOR L1
+        fmri.add_nodes([pre, l1])
+        traverse(master, fmri, '_full')
         
         #l1 = level1(self.out_dir).construct(l1_v, spatial_norm)
         
@@ -57,7 +67,6 @@ class analysis:
         #l3.inputs.inputnode.subjects = subjects
         
         #correct = correction(self.out_dir).construct(corr)
-        
         def remove_container(file):
             return file[0]
         
@@ -343,18 +352,24 @@ class analysis:
         find_bold = Node(Function(input_names=['files', 'task'],
                                   output_names=['file'], function=get_bold), name='find_bold')
         
-        #join_task = JoinNode(IdentityInterface(fields=['score']), name='join_task', joinsource='task', joinfield=['score'])
+        def remove(T1w, bold):
+            return T1w[0], bold[0]
         
+        #join_task = JoinNode(IdentityInterface(fields=['score']), name='join_task', joinsource='task', joinfield=['score'])
+        remove_containers = Node(Function(input_names=['T1w', 'bold'],
+                                         output_names=['T1w', 'bold'], function=remove), name='remove_containers')
         
         fmri.connect([(inputnode, get_files, [('task', 'task')]),
                       (get_files, bids_dg, [('query', 'output_query')]),
                       #(bids_dg, find_bold, [('bold_files', 'files'),
                        #                     ('task', 'task')]),
                       #(find_bold, pre, [('file', 'inputnode.bold')]),
-                      (bids_dg, pre, [(('T1w_files', remove_container), 'inputnode.T1w'),
-                                      (('bold_files', remove_container), 'inputnode.bold')]),
-                      (bids_dg, meta, [(('bold_files', remove_container), 'filename')]),
-                      (bids_dg, events, [(('bold_files', remove_container), 'file')]),
+                      (bids_dg, remove_containers, [('T1w_files', 'T1w'),
+                                                    ('bold_files', 'bold')]),
+                      (remove_containers, pre, [('T1w', 'inputnode.T1w'),
+                                                ('bold', 'inputnode.bold')]),
+                      (remove_containers, meta, [('bold', 'filename')]),
+                      (remove_containers, events, [('bold', 'file')]),
                       (meta, pre, [('TR', 'inputnode.TR')]),
 # =============================================================================
 #                       (meta, l1, [('TR', 'inputnode.TR')]),

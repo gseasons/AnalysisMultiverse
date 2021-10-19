@@ -10,6 +10,9 @@ import re
 from collections import Counter
 import numpy as np
 
+def insert(string, ind, new):
+    return string[:ind] + new + string[ind:]
+
 def make_buff_vars(dic):
     func = "def buff_var({var}):\n\treturn "
     var = [param_key for key in dic for param_key in dic[key] if param_key != 'id' or param_key != 'link']
@@ -108,78 +111,70 @@ def add_mapping(con):
 #still need to add buff for inputs to workflow(up a level) and connect iternode to it []
 #no underscores in node names
 def traverse(dic, flow, suffix):
-    dic_k = list(dic.keys())
-    start_pipe = [i for i in dic_k if type(i) == int]
-    split_nodes, connections = get_links(dic, start_pipe)
+    start_pipe = 0
     iternode = Node(IdentityInterface(fields=['i']), name='iternode'+suffix)
-    iternode.iterables = ('i', start_pipe)
+    iternode.iterables = ('i', [start_pipe])
     
     buff_count = []
     buff_dic = {}
-    for i, info in enumerate(dic[0][0]):
-        if info == 'id' or info == 'link':
-            continue
-        if info not in split_nodes or not i:
-            buff_dic[info] = dic[0][0][info]
-            outstanding = True
-        else:
+    for wf in dic:
+        dic_ = dic[wf]
+        dic_k = list(dic_.keys())
+        start_pipe = [i for i in dic_k if type(i) == int]
+        split_nodes, connections = get_links(dic_, start_pipe)
+        for i, info in enumerate(dic_[0][0]):
+            if info == 'id' or info == 'link':
+                continue
+            if info not in split_nodes or not i:
+                buff_dic[info] = dic_[0][0][info]
+                outstanding = True
+            else:
+                if not buff_count:
+                    buff_count.append(1)
+                connections[buff_count[-1]] = connections.pop(list(buff_dic.keys())[0])
+                func, input_names, output_names = make_buff_vars(buff_dic)
+                vars()['buff_' + str(buff_count[-1])] = Node(Function(input_names=input_names, output_names=output_names), name='buff_' + str(buff_count[-1]))
+                vars()['buff_' + str(buff_count[-1])].inputs.function_str = func
+                setatts(vars()['buff_' + str(buff_count[-1])], dic_, input_names)
+                for name in input_names[:-2]:
+                    end = re.search('^([A-Za-z]+)_([A-Za-z_]+)', name)
+                    flow.get_node(wf).connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(wf).get_node(end.group(1)), end.group(2))
+                buff_count.append(buff_count[-1] + 1)
+                buff_dic = {info: dic_[0][0][info]}
+                outstanding = False
+                
+        if outstanding:
             if not buff_count:
                 buff_count.append(1)
             connections[buff_count[-1]] = connections.pop(list(buff_dic.keys())[0])
             func, input_names, output_names = make_buff_vars(buff_dic)
             vars()['buff_' + str(buff_count[-1])] = Node(Function(input_names=input_names, output_names=output_names), name='buff_' + str(buff_count[-1]))
             vars()['buff_' + str(buff_count[-1])].inputs.function_str = func
-            setatts(vars()['buff_' + str(buff_count[-1])], dic, input_names)
+            setatts(vars()['buff_' + str(buff_count[-1])], dic_, input_names)
+            #buff_count.append(buff_count[-1] + 1)
+        
             for name in input_names[:-2]:
                 end = re.search('^([A-Za-z]+)_([A-Za-z_]+)', name)
-                flow.connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(end.group(1)), end.group(2))
-            buff_count.append(buff_count[-1] + 1)
-            buff_dic = {info: dic[0][0][info]}
-            outstanding = False
-            
-    if outstanding:
-        if not buff_count:
-            buff_count.append(1)
-        connections[buff_count[-1]] = connections.pop(list(buff_dic.keys())[0])
-        func, input_names, output_names = make_buff_vars(buff_dic)
-        vars()['buff_' + str(buff_count[-1])] = Node(Function(input_names=input_names, output_names=output_names), name='buff_' + str(buff_count[-1]))
-        vars()['buff_' + str(buff_count[-1])].inputs.function_str = func
-        setatts(vars()['buff_' + str(buff_count[-1])], dic, input_names)
-        #buff_count.append(buff_count[-1] + 1)
-    
-        for name in input_names[:-2]:
-            end = re.search('^([A-Za-z]+)_([A-Za-z_]+)', name)
-            flow.connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(end.group(1)), end.group(2))
-    
-    for buff in buff_count:
-        if buff == 1:
-            vars()['buff_' + str(buff)].itersource = ('iternode'+suffix, 'i')
-            vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
-            flow.connect(iternode, 'i', vars()['buff_' + str(buff)], 'i_in')
-        else:
-            vars()['buff_' + str(buff)].itersource = ('buff_' + str(buff - 1), 'i')
-            vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
-            flow.connect(vars()['buff_' + str(buff - 1)], 'i', vars()['buff_' + str(buff)], 'i_in')
-    
-    for node in dic['const']:
-        const = dic['const'][node]
-        keys = list(const.keys())
-        vals = list(const.values())
-        for i, k in enumerate(keys):
-            k_var = re.search(node+'_([A-Za-z_]+)', k).group(1)
-            setattr(flow.get_node(node).inputs, k_var, vals[i])
-    
-    if buff_count:
-        joinsource = 'buff_' + str(buff)
-    else:
-        joinsource = ''
+                flow.get_node(wf).connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(wf).get_node(end.group(1)), end.group(2))
         
-    return joinsource
-
-
-def format_out(smoothed, segmentations, warp_file, outliers, mc_par, brain):
-    eff=3
-
+        for buff in buff_count:
+            if buff == 1:
+                vars()['buff_' + str(buff)].itersource = ('iternode'+suffix, 'i')
+                vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
+                flow.get_node(wf).connect(iternode, 'i', vars()['buff_' + str(buff)], 'i_in')
+            else:
+                vars()['buff_' + str(buff)].itersource = ('buff_' + str(buff - 1), 'i')
+                vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
+                flow.get_node(wf).connect(vars()['buff_' + str(buff - 1)], 'i', vars()['buff_' + str(buff)], 'i_in')
+        
+        for node in dic_['const']:
+            const = dic_['const'][node]
+            keys = list(const.keys())
+            vals = list(const.values())
+            for i, k in enumerate(keys):
+                k_var = re.search(node+'_([A-Za-z_]+)', k).group(1)
+                setattr(flow.get_node(wf).get_node(node).inputs, k_var, vals[i])
+                
 
 def define_paths(container, dictionary, indexes):
     out_dic = {}
@@ -209,8 +204,12 @@ def define_paths(container, dictionary, indexes):
             vals, ind = np.unique(container, return_inverse=True, axis=1)
             index = [np.where((vals[:,i].reshape(-1,1) == container).sum(axis=0) == container.shape[0])[0] for i in range(vals.shape[1])]
             index_ = sorted(index, key=min)
-                
-            gen = np.unique(dictionary[key][subkey])
+               
+            try:
+                gen = np.unique(dictionary[key][subkey])
+            except:
+                tostring = [str(item) for item in dictionary[key][subkey]]
+                gen = np.unique(tostring)
             
             for k in out_dic:
                 if type(k) != int:
