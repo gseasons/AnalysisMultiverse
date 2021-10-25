@@ -23,12 +23,12 @@ class spatial_normalization:
     
     def get_warps(self, flow=''):
         from updated.normalization.functions import invert
-        inputnode = Node(IdentityInterface(fields=['brain', 'ref_file']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['brain', 'boldmask', 'concatenate', 'ref_file']), name='inputnode')
         outnode = Node(IdentityInterface(fields=['warp', 'invwarp']), name='outnode')
         
         prelim = Node(FLIRT(dof=12, output_type='NIFTI_GZ'), name='prelim')
         warp = Node(FNIRT(field_file=True, config_file='T1_2_MNI152_2mm'), name='warp')
-        invwarp = Node(Function(input_names=['warp', 'brain', 'warplater'],
+        invwarp = Node(Function(input_names=['warp', 'brain', 'brainmask', 'warplater', 'coregmat', 'concatenate'],
                                 output_names=['invwarp'], function=invert), name='invwarp')
         
         dilatebrain = Node(DilateImage(operation='max'), name='dilatebrain')
@@ -46,6 +46,8 @@ class spatial_normalization:
                               (inputnode, warp, [('brain', 'in_file')]),
                               (inputnode, warp, [('ref_file', 'ref_file')]),
                               (inputnode, invwarp, [('warppostfeat', 'warplater')]),
+                              (inputnode, invwarp, [('boldmask', 'brainmask')]),
+                              (inputnode, invwarp, [('no_resample', 'no_resample')]),
                               (inputnode, invwarp, [('brain', 'brain')]),
                               (warp, invwarp, [('field_file', 'warp')]),
                               (warp, outnode, [('field_file', 'warp')]),

@@ -8,6 +8,7 @@ Created on Mon Oct  4 12:50:07 2021
 def smooth(warped, mask):#, susan, fwhm):
     #WORKFLOW ADAPTED FROM: https://nipype.readthedocs.io/en/latest/users/examples/fmri_fsl.html
     from nipype import Workflow, Node, IdentityInterface
+    from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import (BET, ImageMaths, ImageStats, SUSAN, IsotropicSmooth)
     import os, glob, re
     from functions import get_bright_thresh, getthreshop
@@ -24,9 +25,9 @@ def smooth(warped, mask):#, susan, fwhm):
     outnode = Node(IdentityInterface(fields=['smoothed']), name='outnode')
     
     if susan:
-        meanfunc = Node(ImageMaths(op_string='-Tmean', suffix='_mean'), name='meanfunc')
-        meanfuncmask = Node(BET(mask=True, no_output=True, frac=0.3), name='meanfuncmask')
-        maskfunc = Node(ImageMaths(suffix='_bet', op_string='-mas'), name='maskfunc')
+        #meanfunc = Node(ImageMaths(op_string='-Tmean', suffix='_mean'), name='meanfunc')
+        #meanfuncmask = Node(BET(mask=True, no_output=True, frac=0.3), name='meanfuncmask')
+        maskfunc = Node(ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask), name='maskfunc')
         getthresh = Node(ImageStats(op_string='-p 2 -p 98'), name='getthreshold')
         threshold = Node(ImageMaths(out_data_type='char', suffix='_thresh'), name='threshold')
         
@@ -34,10 +35,10 @@ def smooth(warped, mask):#, susan, fwhm):
         
         smooth_su = Node(SUSAN(fwhm=fwhm), name='smooth_su')
         
-        smooth.connect([(inputnode, meanfunc, [('in_file', 'in_file')]),
-                        (meanfunc, meanfuncmask, [('out_file', 'in_file')]),
+        smooth.connect([#(inputnode, meanfunc, [('in_file', 'in_file')]),
+                        #(meanfunc, meanfuncmask, [('out_file', 'in_file')]),
                         (inputnode, maskfunc, [('in_file', 'in_file')]),
-                        (meanfuncmask, maskfunc, [('mask_file', 'in_file2')]),
+                        #(meanfuncmask, maskfunc, [('mask_file', 'in_file2')]),
                         (maskfunc, getthresh, [('out_file', 'in_file')]),
                         (maskfunc, threshold, [('out_file', 'in_file')]),
                         (getthresh, threshold, [(('out_stat', getthreshop), 'op_string')]),
@@ -62,6 +63,7 @@ def smooth(warped, mask):#, susan, fwhm):
                         
 def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_thresh, warplater):
     from nipype.interfaces.fsl import FLIRT
+    from nipype.interfaces.base import Undefined
     from nipype import IdentityInterface
     from nipype import Workflow, Node
     from os.path import join as opj
@@ -71,6 +73,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
     reg.base_dir = os.getcwd()
     
     bbr = vars().get('bbr', True)
+    concatenate = vars().get('concatenate', True)
     #wmthresh = vars().get('wmthresh', True)
     #warplater = vars().get('warplater', True)
     
@@ -87,42 +90,55 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
         #threshold = Node(Threshold(thresh=wmthresh, in_file=wm_file, args='-bin', output_type='NIFTI_GZ'), name="threshold")
         reg.connect([#(threshold, regbbr, [('out_file', 'wm_seg')]),
                      (regpre, regbbr, [('out_matrix_file', 'in_matrix_file')]),
-                     (regbbr, applywarp, [('out_matrix_file', 'in_matrix_file')]),
+                     #(regbbr, applywarp, [('out_matrix_file', 'in_matrix_file')]),
                      (regbbr, outnode, [('out_matrix_file', 'out_mat')]),
                      ])
+        
+        if not concatenate:
+            reg.connect([(regbbr, applywarp, [('out_matrix_file', 'in_matrix_file')])])
+            
         node_reg = 'regbbr'
     else:
-        reg.connect([(regpre, applywarp, [('out_matrix_file', 'in_matrix_file')]),
+        reg.connect([#(regpre, applywarp, [('out_matrix_file', 'in_matrix_file')]),
                      (regpre, outnode, [('out_matrix_file', 'out_mat')]),
                      ])
+        
+        if not concatenate:
+            reg.connect([(regpre, applywarp, [('out_matrix_file', 'in_matrix_file')])])
+            
         node_reg = 'regpre'
 
     node_warp = 'applywarp'
         
     reg.run()
-        
+    
     out_mat = glob.glob(os.getcwd() + '/reg/' + node_reg + '/*.mat')[0]
-    warped = glob.glob(os.getcwd() + '/reg/' + node_warp + '/*.nii*')[0]
+    if concatenate:
+        warped = corrected_img
+    else:
+        warped = glob.glob(os.getcwd() + '/reg/' + node_warp + '/*.nii*')[0]
         
     return out_mat, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
 
+#SHOULD PROBABLY GET RID OF OUTLIERS HERE
 def regress(unsmoothed, mc_par, segmentations, mask):
     from nipype import Node
-    from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM
+    from nipype.interfaces.base import Undefined
+    from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
     from nipype.interfaces.fsl.maths import MeanImage
     from nipype.interfaces.base import CommandLine
     import numpy as np
     import nibabel as nib
     #from scipy import stats
-    import os
+    import os, re
     
     CSF = vars().get('CSF', True)
     WM = vars().get('WM', True)
     GLOBAL = vars().get('GLOBAL', True)
     params = np.loadtxt(mc_par)
     
-    if vars().get('realignregress', True):
-        params = np.zeros((params[0], 1))
+    if not vars().get('realignregress', False):
+        params = np.zeros((params.shape[0], 1))
         
     resample = False
     suffix = ''
@@ -133,6 +149,7 @@ def regress(unsmoothed, mc_par, segmentations, mask):
     
     if CSF:
         csfmask = segmentations[0]
+        csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
         if resample:
             csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask').run().outputs.out_file
         meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf')
@@ -141,6 +158,7 @@ def regress(unsmoothed, mc_par, segmentations, mask):
         suffix += 'CSF_'
     if WM:
         wmmask = segmentations[2]
+        wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
         if resample:
             wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask').run().outputs.out_file
         meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf')
@@ -161,30 +179,39 @@ def regress(unsmoothed, mc_par, segmentations, mask):
     cl.run().runtime
     
     if np.any(params):
-        glm = Node(GLM(design=name_ + '.mat', in_file=unsmoothed), name='glm')
+        out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
+        glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
     
-        regressed = glm.run()
-        unsmoothed = regressed.outputs.out_res
+        regressed = glm.run().outputs.out_res
+        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+        unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
     
     return unsmoothed
 
-def toMNI(warplater, mniMask, brainmask, warp, warped, segmentations):
-    from nipype.interfaces.fsl import ApplyWarp
-    from nipype import MapNode
-    if not warplater:
+def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat):
+    from nipype.interfaces.fsl import ApplyWarp, ConvertWarp, Threshold, ConvertXFM, FLIRT
+    if not vars().get('warplater', True):
+        
+        for i, file in enumerate(segmentations):
+            segmentations[i] = ApplyWarp(in_file=file, ref_file=mniMask, field_file=warp, interp='nn').run().outputs.out_file
+        
+        if vars().get('concatenate', True):
+            warp = ConvertWarp(reference=mniMask, premat=out_mat, warp1=warp).run().outputs.out_file
+            
         warped = ApplyWarp(in_file=warped, ref_file=mniMask, field_file=warp)
         
         warped = warped.run().outputs.out_file
         brainmask = ApplyWarp(in_file=brainmask, ref_file=mniMask, field_file=warp, interp='nn').run().outputs.out_file
-        segmentations = MapNode(ApplyWarp(in_file=segmentations, ref_file=mniMask, field_file=warp, interp='nn'), iterfield='in_file', name='warp_seg').run().outputs.out_file
-    
-    return warped, brainmask, segmentations
-
-    
-    
-    
-    
-    
+    else:
+        if not vars().get('concatenate', False):
+            brainmask = Threshold(in_file=brain, thresh=0, args='-bin').run().outputs.out_file
+        else:
+            warp = ConvertWarp(reference=mniMask, premat=out_mat, warp1=warp).run().outputs.out_file
+            segform = ConvertXFM(in_file=out_mat, invert_xfm=True).run().outputs.out_file
+            for i, file in enumerate(segmentations):
+                segmentations[i] = FLIRT(in_file=file, reference=warped, interp='nearestneighbour', apply_xfm=True, in_matrix_file=segform).run().outputs.out_file
+            
+    return warped, brainmask, segmentations, warp
     
     
     

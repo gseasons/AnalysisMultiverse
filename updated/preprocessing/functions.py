@@ -27,28 +27,28 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
     if nib.load(mc).shape[0:-1] != nib.load(mask).shape:
         resample = True
         
-    mask = Threshold(in_file=mask, thresh=0, command='-bin').run().outputs.out_file
+    mask = Threshold(in_file=mask, thresh=0, args='-bin').run().outputs.out_file
     if mc_mean and slice_correct:
         if resample:
-            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True).run().outputs.out_file
+            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
         return mean_vol, st, mask
     elif mc_mean:
         if resample:
-            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True).run().outputs.out_file
+            mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
         return mean_vol, mc, mask
     elif slice_correct:
         size = nib.load(mc).shape
-        get_mid = Node(ExtractROI(t_min=round(size[-1]/2), t_size=1), name='get_mid')
+        get_mid = ExtractROI(in_file=mc, t_min=round(size[-1]/2), t_size=1)
         mc_m = get_mid.run().outputs.roi_file
         if resample:
-            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True).run().outputs.out_file
+            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
         return mc_m, st, mask
     else:
         size = nib.load(mc).shape
-        get_mid = Node(ExtractROI(t_min=round(size[-1]/2), t_size=1), name='get_mid')
+        get_mid = ExtractROI(in_file=mc, t_min=round(size[-1]/2), t_size=1)
         mc_m = get_mid.run().outputs.roi_file
         if resample:
-            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True).run().outputs.out_file
+            mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
         return mc_m, mc, mask
     
 def strip_container(in_file):
@@ -58,8 +58,8 @@ def strip_container(in_file):
         return in_file
 
 def function_str(name, dic=''):   
-    from updated.preprocessing.workflows import registration, smooth, regress, toMNI
-    valid_functions = ['registration', 'smooth', 'regress', 'toMNI']
+    from updated.preprocessing.workflows import registration, smooth, regress, mni
+    valid_functions = ['registration', 'smooth', 'regress', 'mni']
     if name in valid_functions:
         func_str = getsource(vars()[name])
         try: 
@@ -80,9 +80,10 @@ def function_str(name, dic=''):
                 ind = search.start(1)
                 block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["for param in {params}:\n",
                 "search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)\n",
-                "setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])\n"])
+                "if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])\n",
+                "else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)\n"])
                 
-                func_str = insert(func_str, ind, block).format(params=out)
+                func_str = insert(func_str, ind, block.format(params=out))
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
         except:
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')

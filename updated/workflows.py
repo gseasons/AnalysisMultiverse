@@ -6,7 +6,7 @@ Created on Tue Oct 12 13:35:10 2021
 @author: grahamseasons
 """
 def write_out(base_dir, pipeline_st, task):
-    outputs = list(locals().keys())[5:]
+    outputs = list(locals().keys())[3:]
     from nipype.interfaces import DataSink
     from nipype import Node
     import re, os

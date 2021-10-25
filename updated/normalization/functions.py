@@ -5,12 +5,15 @@ Created on Thu Oct 14 10:31:37 2021
 
 @author: grahamseasons
 """
-def invert(warp, brain, warplater):
+def invert(warp, brain, brainmask, warplater, coregmat, concatenate):
     from nipype import Node
-    from nipype import InvWarp
+    from nipype.interfaces.fsl import InvWarp, ConvertXFM, ConvertWarp
     if warplater:
-        invwarp = Node(InvWarp(warp=warp, ref=brain), name='invwarp')
+        invwarp = Node(InvWarp(warp=warp, reference=brain), name='invwarp')
         invwarp = invwarp.run().outputs.inverse_warp
+        if concatenate:
+            invcoreg = ConvertXFM(in_file=coregmat, invert_xfm=True).run().outputs.out_file
+            invwarp = ConvertWarp(reference=brainmask, postmat=invcoreg, warp1=invwarp).run().outputs.out_file
     else:
         invwarp = ''
     return invwarp

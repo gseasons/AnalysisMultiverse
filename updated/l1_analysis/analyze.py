@@ -26,10 +26,11 @@ class level1(spatial_normalization):
         inputnode = Node(IdentityInterface(fields=['smoothed', 'unsmoothed', 'brainmask', 'segmentations', 'warp_file', 'outliers', 'brain', 'invwarp',
                                                    'event_file', 'TR', 'mask']), name='inputnode')
         
-        intermediates = ['cope', 'varcope', 'bold', 'feat_dir']
+        intermediates = ['cope', 'varcope', 'bold', 'feat_dir', 'seed']
         files = ['design.con', 'design.mat']
         
-        self.apply_warps(level1, func_dic)
+        self.l1(level1, func_dic)
+        self.apply_warps(level1)
         
         level1.connect([(inputnode, level1.get_node('Finfo'), [('mask', 'mask'),
                                                                ('event_file', 'event_file'),
@@ -42,23 +43,24 @@ class level1(spatial_normalization):
                                                                ('invwarp', 'invwarp'),
                                                                ('outliers', 'outliers'),
                                                                ]),
-                        (inputnode, level1.get_node('Finfo'), [('TR', 'TR')]),
-                        (inputnode, level1.get_node('l1d'), [('TR', 'TR')]),
-                        (inputnode, level1.get_node('applywarpcopes'), [('warp_file', 'warp_file')]),
-                        (inputnode, level1.get_node('applywarpvarcopes'), [('warp_file', 'warp_file')]),
-                        (inputnode, level1.get_node('applywarpbold'), [('warp_file', 'warp_file')]),
+                        (inputnode, level1.get_node('l1d'), [('TR', 'interscan_interval')]),
+                        (inputnode, level1.get_node('correction'), [('TR', 'TR')]),
+                        (inputnode, level1.get_node('applywarpcopes'), [('warp_file', 'field_file')]),
+                        (inputnode, level1.get_node('applywarpvarcopes'), [('warp_file', 'field_file')]),
+                        (inputnode, level1.get_node('applywarpbold'), [('warp_file', 'field_file')]),
                         (inputnode, level1.get_node('applywarpcopes'), [('mask', 'ref_file')]),
                         (inputnode, level1.get_node('applywarpvarcopes'), [('mask', 'ref_file')]),
                         (inputnode, level1.get_node('applywarpbold'), [('mask', 'ref_file')]),
                         (level1.get_node('feat'), level1.get_node('selectfiles'), [('feat_dir', 'base_directory')]),
                         ])
         
-        outnode = Node(IdentityInterface(fields=['feat_dir', 'cope', 'varcope', 'bold']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['feat_dir', 'cope', 'varcope', 'bold', 'ev_files']), name='outnode')
         
         level1.connect([(level1.get_node('feat'), outnode, [('feat_dir', 'feat_dir')]),
                         (level1.get_node('ret'), outnode, [('cope', 'cope'),
                                                            ('varcope', 'varcope'),
                                                            ('bold', 'bold')]),
+                        (level1.get_node('l1d'), outnode, [('ev_files', 'ev_files')]),
                         ])
         
         write = Node(Function(input_names=['base_dir', 'pipeline_st', 'task']+intermediates), name='write')
@@ -73,16 +75,24 @@ class level1(spatial_normalization):
                                                          ('bold', 'bold')]),
                         ])
         
+        if 'rest' in self.task:
+            level1.connect([(level1.get_node('Finfo'), write, [('seed', 'seed')])])
+        
+        return level1
         
         
     def l1(self, flow, func_dic):
         from updated.l1_analysis.functions import function_str, correct_task_timing, contrasts
-        network = Node(IdentityInterface(fields='network'), name='network')
-        network.iterables = [('network', range(self.networks))]
+        networks = Node(IdentityInterface(fields=['network']), name='networks')
+        networks.iterables = ('network', range(self.networks))
         
-        func_str, input_names = function_str('sessioninfo', func_dic)
-        Finfo = Node(Function(input_names=input_names, output_names=['session_info']), name='Finfo')
-        Finfo.function_str = func_str
+        func_str, input_names = function_str('info', func_dic)
+        if 'rest' in self.task:
+            outnames = ['session_info', 'seed']
+        else:
+            outnames = ['session_info']
+        Finfo = Node(Function(input_names=input_names, output_names=outnames), name='Finfo')
+        Finfo.inputs.function_str = func_str
         Finfo.inputs.task = self.task
         
         correction = Node(Function(input_names=['session_info', 'TR', 'discard'], 
@@ -96,7 +106,7 @@ class level1(spatial_normalization):
         l1d = Node(Level1DesignVersatile(), name='l1d')
         feat = Node(FEAT(), name='feat')
         
-        flow.connect([(network, Finfo, [('network', 'network')]),
+        flow.connect([(networks, Finfo, [('network', 'network')]),
                       (Finfo, correction, [('session_info', 'session_info')]),
                       (correction, contrasts, [('session_info', 'session_info')]),
                       (correction, l1d, [('session_info', 'session_info')]),

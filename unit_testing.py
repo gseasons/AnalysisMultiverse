@@ -6,9 +6,18 @@ Created on Wed Aug 11 11:48:57 2021
 @author: grahamseasons
 """
 from niworkflows.anat.ants import init_brain_extraction_wf
-#wf = init_brain_extraction_wf()
-#wf.inputs.inputnode.in_files = '/Volumes/NewVolume/super_agers/sub-002S6009/anat/sub-002S6009_T1w.nii.gz'
-#wf.run()
+from bids.layout import BIDSLayout
+from nipype import IdentityInterface, Node, DataSink
+data_dir = '/Volumes/NewVolume/super_agers'
+out_dir = '/Volumes/NewVolume/brain_extracted'
+layout = BIDSLayout(data_dir)
+subjects = layout.get_subjects()
+data = Node(DataSink(), name='data')
+for subject in subjects:
+    wf = init_brain_extraction_wf()
+    wf.inputs.inputnode.in_files = '/Volumes/NewVolume/super_agers/sub-{SUB}/anat/sub-{SUB}_T1w.nii.gz'.format(SUB=subject)
+    wf.connect(wf.get_node('outputnode'), 'out_file', data, out_dir)
+    wf.run()
 
 from nipype.algorithms.modelgen import orth
 import numpy as np

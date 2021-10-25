@@ -14,6 +14,7 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     from nipype import Node
     from nipype.interfaces.afni.utils import ReHo
     from nipype.interfaces.fsl.maths import TemporalFilter, Threshold#, UnaryMaths
+    from nipype.interfaces.fsl import IsotropicSmooth
     
     bpfilter = Node(TemporalFilter(in_file=unsmoothed), name='bpfilter')
     #HZ to sigma conversion taken from: https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;fc5b33c5.1205
@@ -21,13 +22,13 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     bpfilter.inputs.highpass_sigma = 1 / (2 * TR * hp)
     
     filtered = bpfilter.run().outputs.out_file
-    
+    filtered = IsotropicSmooth(fwhm=6, in_file=filtered).run().outputs.out_file
     reho = Node(ReHo(in_file=filtered), name='reho')
     reho.inputs.neighborhood = k
     reho.inputs.mask_file = mask#Node(UnaryMaths(in_file=mask, operation='bin'), name='binmask').run().outputs.out_file
     rehomap = reho.run().outputs.out_file
     
-    thresh = Node(Threshold(in_file=rehomap, args='-bin'))
+    thresh = Node(Threshold(in_file=rehomap, args='-bin'), name='thresh')
     thresh.inputs.thresh = kcc
     
     return thresh.run().outputs.out_file
@@ -46,8 +47,8 @@ def invert(warp, brain):
     return invwarp.run().outputs.inverse_warp
 
 def function_str(name, dic=''):   
-    from updated.l1_analysis.workflows import sessioninfo
-    valid_functions = ['sessioninfo']
+    from updated.l1_analysis.workflows import info
+    valid_functions = ['info']
     if name in valid_functions:
         func_str = getsource(vars()[name])
         try: 
@@ -70,7 +71,7 @@ def function_str(name, dic=''):
                 "search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)\n",
                 "setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])\n"])
                 
-                func_str = insert(func_str, ind, block).format(params=out)
+                func_str = insert(func_str, ind, block.format(params=out))
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
         except:
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
@@ -98,7 +99,7 @@ def get_sink(inputs, files):
     search = re.search('\n(\n)(\s+)(setattr)', func_str)
     ind = search.start(1)
     
-    block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["if os.path.isdir(out):\n",
+    block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["if isinstance(out, str) and os.path.isdir(out):\n",
         "for file in {files}:\n",
         "    file = out + '/' + file\n",
         "    if os.path.isdir(file) or os.path.isfile(file):\n",

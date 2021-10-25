@@ -7,11 +7,12 @@ Created on Thu Sep 30 13:29:04 2021
 """
 from updated.normalization.spatial_normalization import spatial_normalization
 from nipype import Workflow, Node, IdentityInterface, Function
-from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, BET, FAST, FilterRegressor, GLM
+from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, BET, FAST, FilterRegressor, GLM, UnaryMaths
 from nipype.algorithms.rapidart import ArtifactDetect
 import os
 from updated.preprocessing.functions import get_wm, get_sink
 from niworkflows.anat.ants import init_brain_extraction_wf
+from niworkflows.func.util import init_enhance_and_skullstrip_bold_wf
 
 
 
@@ -27,7 +28,7 @@ class preprocess(spatial_normalization):
         preprocess.base_dir = os.getcwd()
         inputnode = Node(IdentityInterface(fields=['bold', 'T1w', 'TR', 'mask']), name='inputnode')
         
-        intermediates = ['smoothed', 'segmentations', 'warp', 'warp_field', 'brain', 'outliers', 'plots', 'invwarp']
+        intermediates = ['smoothed', 'segmentations', 'warp', 'warp_field', 'brain', 'outliers', 'plots', 'invwarp', 'coregmat']
         
         self.preprocessing(preprocess, func_dic)
         self.get_warps(preprocess)
@@ -43,22 +44,28 @@ class preprocess(spatial_normalization):
                             (inputnode, preprocess.get_node('Fmni'), [('mask', 'mniMask')]),
                             (preprocess.get_node('bet_strip'), preprocess.get_node('warp'), [('out_file', 'in_file')]),
                             (preprocess.get_node('bet_strip'), preprocess.get_node('invwarp'), [('out_file', 'brain')]),
+                            (preprocess.get_node('Fregistration'), preprocess.get_node('invwarp'), [('out_mat', 'coregmat')]),
+                            (preprocess.get_node('Fmni'), preprocess.get_node('invwarp'), [('brainmask', 'brainmask')]),
                             (preprocess.get_node('bet_strip'), preprocess.get_node('prelim'), [('out_file', 'in_file')]),
                             (preprocess.get_node('bet_strip'), preprocess.get_node('decision'), [('out_file', 'mask')]),
-                            (preprocess.get_node('decision'), preprocess.get_node('dilatebrain'), [('mask', 'in_file')]),
+                            (preprocess.get_node('bet_strip'), preprocess.get_node('dilatebrain'), [('out_file', 'in_file')]),
                             (preprocess.get_node('warp'), preprocess.get_node('Fmni'), [('field_file', 'warp')]),
                             ])
         
-        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'outliers', 'mc_par', 'brain', 'brainmask', 'unsmoothed', 'invwarp']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'outliers', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
         
         preprocess.connect([(preprocess.get_node('bet_strip'), outnode, [('out_file', 'brain')]),
                             (preprocess.get_node('Fmni'), outnode, [('segmentations', 'segmentations')]),
                             (preprocess.get_node('Fsmooth'), outnode, [('smooth', 'smoothed')]),
-                            (preprocess.get_node('warp'), outnode, [('field_file', 'warp_file')]),
+                            (preprocess.get_node('Fsmooth'), outnode, [('files', 'keepsmooth')]),
+                            #(preprocess.get_node('warp'), outnode, [('field_file', 'warp_file')]),
+                            (preprocess.get_node('Fmni'), outnode, [('warp', 'warp_file')]),
                             (preprocess.get_node('invwarp'), outnode, [('invwarp', 'invwarp')]),
-                            (preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
+                            #(preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
                             (preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
-                            (preprocess.get_node('Fmni'), outnode, [('brainmask', 'brainmask')]),
+                            #(preprocess.get_node('Fregistration'), outnode, [('out_mat', 'coregmat')]),
+                            (preprocess.get_node('Fregistration'), outnode, [('files', 'keepreg')]),
+                            (preprocess.get_node('fillmask'), outnode, [('out_file', 'brainmask')]),
                             ])
         
         if 'rest' in self.task:
@@ -77,6 +84,7 @@ class preprocess(spatial_normalization):
         
         preprocess.connect([(preprocess.get_node('bet_strip'), write, [('out_file', 'brain')]),
                             (preprocess.get_node('Fsmooth'), write, [('smooth', 'smoothed')]),
+                            (preprocess.get_node('Fregistration'), write, [('out_mat', 'coregmat')]),
                             (preprocess.get_node('fast'), write, [('tissue_class_files', 'segmentations')]),
                             (preprocess.get_node('warp'), write, [('field_file', 'warp_field'),
                                                                   ('warped_file', 'warp')]),
@@ -114,21 +122,24 @@ class preprocess(spatial_normalization):
                                   plot_type='svg'),
                    name="art")
         
+        fillmask = Node(UnaryMaths(operation='fillh'), name='fillmask')
+        
         if 'rest' in self.task:
             func_str, input_names = function_str('regress', func_dic)
             Fregress = Node(Function(input_names=input_names,
                                      output_names=['warped']), name='Fregress')
-            Fregress.function_str = func_str
+            Fregress.inputs.function_str = func_str
             
             flow.connect([(flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
                           (flow.get_node('Fmni'), Fregress, [('brainmask', 'mask')]),
                           (flow.get_node('Fmni'), Fregress, [('segmentations', 'segmentations')]),
                           (mcflirt, Fregress, [('par_file', 'mc_par')]),
                           (Fregress, Fsmooth, [('warped', 'warped')]),
+                          (fillmask, Fsmooth, [('out_file', 'mask')]),
                           ])
         else:
             flow.connect([(flow.get_node('Fmni'), Fsmooth, [('warped', 'warped')]),
-                          (flow.get_node('Fmni'), Fsmooth, [('brainmask', 'mask')]),
+                          (fillmask, Fsmooth, [('out_file', 'mask')]),
                           ])
         
         flow.connect([(extract, mcflirt, [('roi_file', 'in_file')]),
@@ -141,6 +152,8 @@ class preprocess(spatial_normalization):
                                                                   ('corrected_img', 'corrected_img'),
                                                                   ('mask', 'brainmask')]),
                       (decision, flow.get_node('Fmni'), [('mask', 'brainmask')]),
+                      (decision, flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
+                      (flow.get_node('boldmask'), fillmask, [('outputnode.skull_stripped_file', 'in_file')]),
                       (flow.get_node('Fregistration'), art, [('warped', 'realigned_files')]),
                       ])
         
@@ -149,7 +162,7 @@ class preprocess(spatial_normalization):
         bet = init_brain_extraction_wf(name='bet')
         bet_strip = Node(Function(input_names='in_file', output_names='out_file', function=strip_container), name='bet_strip')
         #bet = Node(BET(output_type='NIFTI_GZ'), name='bet')
-        fast = Node(FAST(output_type='NIFTI_GZ'), name='fast')
+        fast = Node(FAST(output_type='NIFTI_GZ', segments=True), name='fast')
         
         func_str, input_names = function_str('registration', func_dic)
         
@@ -158,16 +171,22 @@ class preprocess(spatial_normalization):
                              name='Fregistration')
         Fregistration.inputs.function_str = func_str
         
-        func_str, input_names = function_str('toMNI', func_dic)
+        func_str, input_names = function_str('mni', func_dic)
         
         Fmni = Node(Function(input_names=input_names,
-                             output_names=['warped', 'brainmask', 'segmentations']), 
+                             output_names=['warped', 'brainmask', 'segmentations', 'warp']), 
                              name='Fmni')
+        Fmni.inputs.function_str = func_str
+        
+        boldmask = init_enhance_and_skullstrip_bold_wf(name='boldmask', pre_mask=True)
         
         flow.connect([(bet, bet_strip, [('outputnode.out_file', 'in_file')]),
                       (bet_strip, fast, [('out_file', 'in_files')]),
                       (bet_strip, Fregistration, [('out_file', 'bet')]),
+                      (bet_strip, Fmni, [('out_file', 'brain')]),
                       (fast, Fregistration, [(('tissue_class_files', get_wm), 'wm_file')]),
                       (fast, Fmni, [('tissue_class_files', 'segmentations')]),
                       (Fregistration, Fmni, [('warped', 'warped')]),
+                      (Fregistration, Fmni, [('out_mat', 'out_mat')]),
+                      (Fmni, boldmask, [('brainmask', 'inputnode.pre_mask')]),
                       ])

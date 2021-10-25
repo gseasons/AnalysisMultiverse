@@ -44,6 +44,11 @@ def get_links(dic, keys):
                 pipeline_keys = list(sub_dic.keys())
                 pipeline_keys.remove('id')
                 #pipeline_keys.sort()
+            else:
+                pipeline_keys = list(sub_dic[key].keys())
+                if pipeline_keys[0] not in connections:
+                    connections[pipeline_keys[0]] = {}
+                connections[pipeline_keys[0]][key] = [key]
         except:
             check = True
             pipeline_keys = sorted(list(sub_dic.keys()))
@@ -70,8 +75,9 @@ def get_links(dic, keys):
                             if key_ in connections[node]:
                                 connections[node][key_].append(k)
                             else:
-                                connections[node][key_] = [link_key]
-                                connections[node][key_].append(k)
+                                connections[node][key_] = [link_key]###
+                                if link_key != k:
+                                    connections[node][key_].append(k)
                             #index = list(connections[list(link.values())[0][0]].keys())[0]
                             #connections[list(link.values())[0][0]][index].append(k)
                     except:
@@ -116,8 +122,8 @@ def traverse(dic, flow, suffix):
     iternode.iterables = ('i', [start_pipe])
     
     buff_count = []
-    buff_dic = {}
     for wf in dic:
+        buff_dic = {}
         dic_ = dic[wf]
         dic_k = list(dic_.keys())
         start_pipe = [i for i in dic_k if type(i) == int]
@@ -137,11 +143,11 @@ def traverse(dic, flow, suffix):
                 vars()['buff_' + str(buff_count[-1])].inputs.function_str = func
                 setatts(vars()['buff_' + str(buff_count[-1])], dic_, input_names)
                 for name in input_names[:-2]:
-                    end = re.search('^([A-Za-z]+)_([A-Za-z_]+)', name)
+                    end = re.search('^([A-Za-z0-9]+)_([A-Za-z_]+)', name)
                     flow.get_node(wf).connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(wf).get_node(end.group(1)), end.group(2))
                 buff_count.append(buff_count[-1] + 1)
                 buff_dic = {info: dic_[0][0][info]}
-                outstanding = False
+                outstanding = True
                 
         if outstanding:
             if not buff_count:
@@ -154,14 +160,16 @@ def traverse(dic, flow, suffix):
             #buff_count.append(buff_count[-1] + 1)
         
             for name in input_names[:-2]:
-                end = re.search('^([A-Za-z]+)_([A-Za-z_]+)', name)
+                end = re.search('^([A-Za-z0-9]+)_([A-Za-z_]+)', name)
                 flow.get_node(wf).connect(vars()['buff_' + str(buff_count[-1])], name, flow.get_node(wf).get_node(end.group(1)), end.group(2))
         
         for buff in buff_count:
-            if buff == 1:
+            if buff == 1 and vars().get('buff_1', False):
                 vars()['buff_' + str(buff)].itersource = ('iternode'+suffix, 'i')
                 vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
                 flow.get_node(wf).connect(iternode, 'i', vars()['buff_' + str(buff)], 'i_in')
+            elif not vars().get('buff_1', False):
+                break
             else:
                 vars()['buff_' + str(buff)].itersource = ('buff_' + str(buff - 1), 'i')
                 vars()['buff_' + str(buff)].iterables = [('i', connections[buff])]
@@ -174,6 +182,9 @@ def traverse(dic, flow, suffix):
             for i, k in enumerate(keys):
                 k_var = re.search(node+'_([A-Za-z_]+)', k).group(1)
                 setattr(flow.get_node(wf).get_node(node).inputs, k_var, vals[i])
+        
+        if buff_count:
+            buff_count = [buff_count[-1]+1]
                 
 
 def define_paths(container, dictionary, indexes):
@@ -188,7 +199,7 @@ def define_paths(container, dictionary, indexes):
     
     for i, vals in enumerate(indexes):
         if isinstance(vals, np.ndarray):
-            out_dic[i] = {'id': vals}
+            out_dic[int(indexes[i].min())] = {'id': vals}
         else:
             out_dic[i] = {'id': np.array(range(vals))}
             

@@ -1,0 +1,463 @@
+[
+    {
+        "group": 1,
+        "imports": [],
+        "name": "00_lap_tmpl",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "00_lap_tmpl"
+        ],
+        "name": "01_mrg_tmpl",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [],
+        "name": "02_full_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [],
+        "name": "03_res_tmpl",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [],
+        "name": "04_truncate_images",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "04_truncate_images"
+        ],
+        "name": "05_inu_n4",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "05_inu_n4"
+        ],
+        "name": "06_lap_target",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "05_inu_n4",
+            "06_lap_target"
+        ],
+        "name": "07_mrg_target",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "05_inu_n4"
+        ],
+        "name": "08_res_target",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "03_res_tmpl",
+            "08_res_target"
+        ],
+        "name": "09_init_aff",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "09_init_aff",
+            "01_mrg_tmpl",
+            "07_mrg_target"
+        ],
+        "name": "10_norm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "02_full_wm",
+            "10_norm"
+        ],
+        "name": "11_map_wmmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "11_map_wmmask"
+        ],
+        "name": "12_inu_n4_final",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "10_norm"
+        ],
+        "name": "13_map_brainmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "13_map_brainmask"
+        ],
+        "name": "14_thr_brainmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "14_thr_brainmask"
+        ],
+        "name": "15_03_pad_mask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "14_thr_brainmask"
+        ],
+        "name": "16_dil_brainmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "16_dil_brainmask"
+        ],
+        "name": "17_get_brainmask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "17_get_brainmask",
+            "12_inu_n4_final"
+        ],
+        "name": "18_01_atropos",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "18_01_atropos",
+            "11_map_wmmask"
+        ],
+        "name": "19_match_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "18_01_atropos",
+            "19_match_wm"
+        ],
+        "name": "20_overlap",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "18_01_atropos",
+            "20_overlap"
+        ],
+        "name": "21_sel_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "21_sel_wm"
+        ],
+        "name": "22_copy_xform_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "22_copy_xform_wm",
+            "14_thr_brainmask",
+            "11_map_wmmask"
+        ],
+        "name": "23_apply_wm_prior",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "23_apply_wm_prior"
+        ],
+        "name": "24_inu_n4_final",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "18_01_atropos"
+        ],
+        "name": "25_02_pad_segm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "25_02_pad_segm"
+        ],
+        "name": "26_04_sel_labels",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "26_04_sel_labels"
+        ],
+        "name": "27_27_depad_csf",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "26_04_sel_labels"
+        ],
+        "name": "28_10_me_csf",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "26_04_sel_labels"
+        ],
+        "name": "29_06_get_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "29_06_get_gm"
+        ],
+        "name": "30_07_fill_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "29_06_get_gm",
+            "30_07_fill_gm"
+        ],
+        "name": "31_08_mult_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "31_08_mult_gm",
+            "28_10_me_csf"
+        ],
+        "name": "32_11_add_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "32_11_add_gm"
+        ],
+        "name": "33_12_relabel_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "33_12_relabel_gm"
+        ],
+        "name": "34_25_depad_gm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "26_04_sel_labels"
+        ],
+        "name": "35_05_get_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "35_05_get_wm"
+        ],
+        "name": "36_09_relabel_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "36_09_relabel_wm"
+        ],
+        "name": "37_26_depad_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "37_26_depad_wm",
+            "34_25_depad_gm",
+            "27_27_depad_csf"
+        ],
+        "name": "38_merge_tpms",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "36_09_relabel_wm",
+            "33_12_relabel_gm"
+        ],
+        "name": "39_13_add_gm_wm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "39_13_add_gm_wm"
+        ],
+        "name": "40_24_depad_segm",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "39_13_add_gm_wm"
+        ],
+        "name": "41_14_sel_labels2",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "41_14_sel_labels2"
+        ],
+        "name": "42_15_add_7",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "42_15_add_7"
+        ],
+        "name": "43_16_me_7",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "43_16_me_7"
+        ],
+        "name": "44_17_comp_7",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "44_17_comp_7"
+        ],
+        "name": "45_18_md_7",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "45_18_md_7"
+        ],
+        "name": "46_19_fill_7",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "15_03_pad_mask",
+            "46_19_fill_7"
+        ],
+        "name": "47_20_add_7_2",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "47_20_add_7_2"
+        ],
+        "name": "48_21_md_7_2",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "48_21_md_7_2"
+        ],
+        "name": "49_22_me_7_2",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "49_22_me_7_2"
+        ],
+        "name": "50_23_depad_mask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "50_23_depad_mask"
+        ],
+        "name": "51_msk_conform",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "24_inu_n4_final",
+            "51_msk_conform",
+            "40_24_depad_segm",
+            "38_merge_tpms"
+        ],
+        "name": "52_copy_xform",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "52_copy_xform"
+        ],
+        "name": "53_apply_mask",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "53_apply_mask"
+        ],
+        "name": "54_data",
+        "size": 1
+    },
+    {
+        "group": 1,
+        "imports": [
+            "12_inu_n4_final",
+            "14_thr_brainmask"
+        ],
+        "name": "55_apply_mask",
+        "size": 1
+    }
+]

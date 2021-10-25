@@ -15,11 +15,11 @@ from bids.layout import BIDSLayout
 from nipype.interfaces.base import Undefined
 #from nipype.interfaces.traits import _Undefined
 
-exp_dir = '/Volumes/NewVolume/sup_preprocess_test_join_reg_fix'
+exp_dir = '/Volumes/NewVolume/sup_pre_l1_v2'
 working_dir = 'working_dir'
 data_dir = '/Volumes/NewVolume/super_agers'
 out_dir = exp_dir + '/processed'
-mask = opj(os.getenv('FSLDIR'), 'data/linearMNI/MNI152lin_T1_2mm_brain.nii.gz')
+mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')#'data/linearMNI/MNI152lin_T1_2mm_brain.nii.gz')
 group_num = 10
 
 links = {'preprocess': {
@@ -29,7 +29,10 @@ links = {'preprocess': {
          'Fregistration_regbbr_interp': ['Fregistration_regpre_interp', 'Fregistration_bbr'],
          'Fregistration_regbbr_no_resample': ['Fregistration_regpre_no_resample', 'Fregistration_bbr'],
          'Fregistration_applywarp_interp': 'Fregistration_regpre_interp',
-         'Fregistration_applywarp_no_resample': 'Fregistration_regpre_no_resample'
+         'Fregistration_applywarp_no_resample': 'Fregistration_regpre_no_resample',# 'Fregistration_bbr'],
+         'invwarp_warplater': 'Fmni_warplater',
+         'invwarp_concatenate': 'Fregistration_concatenate',
+         'Fmni_concatenate': 'Fregistration_concatenate',
          },
          'level1': {
          'seedinfo': ['atlas', 'data'],
@@ -40,14 +43,15 @@ links = {'preprocess': {
          'kcc': ['data'],
          'lp': ['data'],
          'hp': ['data'],
-         'invwarp_warppostfeat': 'Fmni_warplater',
          'Finfo_warppostfeat': 'Fmni_warplater',
+         'Finfo_concatenate': 'Fregistration_concatenate',
          'correction_discard': 'extract_t_min',
          'applywarpcopes_interp': 'Fmni_warped_interp',
          'applywarpvarcopes_interp': 'Fmni_warped_interp',
          'applywarpbold_interp': 'Fmni_warped_interp',
          'ret_needwarp': 'Fmni_warplater',
-         'ident_needwarp': 'Fmni_warplater'
+         'ident_needwarp': 'Fmni_warplater',
+         'correction_discard': 'extract_t_min',
          },
          }
 #NOTE: #** means input cannot be removed
@@ -69,48 +73,27 @@ genes = [{'dilateref_kernel_size': [0]},#[0, 4, 8]},
 #               1: {'robust': False, 'reduce_bias': True, 'remove_eyes': False},
 #               2: {'robust': False, 'reduce_bias': False, 'remove_eyes': True}},
 # =============================================================================
-         {'extract_t_min': [0]},
-         {'mcflirt_interpolation': [0, 1, 2],
+         {'extract_t_min': [10]},
+         {'mcflirt_interpolation': [0],#, 1, 2],
              0: 'spline',
              1: 'nn',
              2: 'sinc'},
-         {'mcflirt_mean_vol': [0, 1],
+         {'mcflirt_mean_vol': [0],#, 1],
               0: False,
               1: True},
-         {'decision_slice_correct': [0, 1],
-              0: False,
-              1: True},
-         {'Fregress_CSF': [0, 1],
-              0: False,
-              1: True},
-         {'Fregress_WM': [0, 1],
-              0: False,
-              1: True},
-         {'Fregress_GLOBAL': [0, 1],
-              0: False,
-              1: True},
-         {'Fregress_glm_dat_norm': [1],
-              0: False,
-              1: True},
-         {'Fregress_glm_demean': [1],
-              0: False,
-              1: True},
-         {'Fmni_realignregress': [0, 1],
-              0: False,
-              1: True},
-         {'Fmni_warplater': [0, 1],
+         {'decision_slice_correct': [0],#, 1],
               0: False,
               1: True},
          #
-         {'prelim_interp': [0, 1, 2, 3],
+         {'prelim_interp': [0],#, 1, 2, 3],
               0: 'trilinear',
               1: 'nearestneighbour',
               2: 'sinc',
               3: 'spline'},
-         {'prelim_no_resample': [0, 1],
+         {'prelim_no_resample': [0],
               0: False,
               1: True},
-         {'dilatebrain_kernel_size': [0, 4, 8]},
+         {'dilatebrain_kernel_size': [0]},#, 4, 8]},
          {'dilatebrain_kernel_shape': [5],
               0: '3D',
               1: '2D',
@@ -119,35 +102,60 @@ genes = [{'dilateref_kernel_size': [0]},#[0, 4, 8]},
               4: 'gauss',
               5: 'sphere'},
          #DILATEREF USED TO BE HERE
-         {'warp_warp_resolution': [0, 1],
+         {'warp_warp_resolution': [0],#, 1],
               0: (10,10,10),
               1: (20,20,20)},
-         
          #EVERYTHING ABOVE BET USED TO BE HERE
          {'Fregistration_bbr': [1],#**
               0: False,
               1: True},
-         {'Fregistration_regpre_interp': [0, 1, 2, 3],
+         {'Fregistration_regpre_interp': [0],#, 1, 2, 3],
               0: 'trilinear',
               1: 'nearestneighbour',
               2: 'sinc',
               3: 'spline'},
-         {'Fregistration_regpre_no_resample': [0, 1],
+         {'Fregistration_regpre_no_resample': [0], #Fregistration_regpre_no_resample
               0: False,
               1: True},
-         {'Fregistration_applywarp_': [1],
-              0: {'apply_isoxfm': 4, 'apply_xfm': Undefined, 'uses_qform': Undefined},
-              1: {'apply_isoxfm': Undefined, 'apply_xfm': True, 'uses_qform': True}},
-         {'Fmni_warped_interp': [0, 1, 2, 3],#**
+         {'Fregistration_applywarp_': [1], #NOTE: if setting a node input inside function to Undefined -> use empty string
+              0: {'apply_isoxfm': 4, 'apply_xfm': '', 'uses_qform': ''},
+              1: {'apply_isoxfm': '', 'apply_xfm': True, 'uses_qform': ''}},
+         {'Fregistration_concatenate': [1],
+              0: False,
+              1: True},
+         #{'Fregistration_wmthresh': {'low': 0.2, 'high': 0.8, 'step': 0.1}},#**
+         {'Fmni_warplater': [1],
+              0: False,
+              1: True},
+         {'Fmni_warped_interp': [0],#, 1],#, 2, 3],#**
               0: 'nn',
               1: 'trilinear',
               2: 'sinc',
               3: 'spline'},
-         #{'Fregistration_wmthresh': {'low': 0.2, 'high': 0.8, 'step': 0.1}},#**
+         {'!invwarp_': [0],
+              0: 'LINK'},
+         {'Fregress_CSF': [1],#, 1],
+              0: False,
+              1: True},
+         {'Fregress_WM': [1],#, 1],
+              0: False,
+              1: True},
+         {'Fregress_GLOBAL': [1],#, 1],
+              0: False,
+              1: True},
+         {'Fregress_glm_dat_norm': [1],
+              0: False,
+              1: True},
+         {'Fregress_glm_demean': [1],
+              0: False,
+              1: True},
+         {'Fregress_realignregress': [1],#, 1],
+              0: False,
+              1: True},
          {'Fsmooth_susan': [1],#**
               0: False,
               1: True},
-         {'Fsmooth_fwhm': range(2, 13, 2)},#**
+         {'Fsmooth_fwhm': range(2, 8, 2)},#13, 10)},#2)},#**
          #ART
          {'end_preprocess': 'level1'},
          #Finfo_rest OPTIONS WILL NEED TO BE PARTIALLY USER DEFINED -> gui to ask?
@@ -156,13 +164,13 @@ genes = [{'dilateref_kernel_size': [0]},#[0, 4, 8]},
               1: 'ROI',
               2: 'data'},
          {'~construct~Finfo_rest_seedinfo': {'low': -0.5, 'high': 2.5},
-              0: [('cing post', 25)], #can include atlas name with seed info -> user specified
-              1: [('cing post', 5, 95)], #different variations on same mask, or list masks targeting different networks
-              2: [('cing post', 50)]},
+              0: [('cing post', 1)], #can include atlas name with seed info -> user specified
+              1: [('cing post', 0, 1)], #different variations on same mask, or list masks targeting different networks
+              2: [('cing post', 1)]},
          {'~construct~Finfo_rest_coords': [0],
-              0: [(50, 25, 60),(75, 30, 60),(100, 85, 62)],
-              1: [(),(),()],
-              2: [(),(),()]},
+              0: [(44, 35, 44)],#[(),(),()]
+              1: [(44, 37, 49)],
+              2: [(47, 38, 56)]},
          {'~construct~Finfo_rest_radius': range(3, 11)},
          {'~construct~Finfo_rest_atlas': [0],
               0: 'harvard'},
@@ -173,8 +181,6 @@ genes = [{'dilateref_kernel_size': [0]},#[0, 4, 8]},
          {'~construct~Finfo_rest_kcc': [0.5, 0.6, 0.7]},
          {'~construct~Finfo_rest_lp': [0.01]},
          {'~construct~Finfo_rest_hp': [0.1]},
-         {'!invwarp_': [0],
-              0: 'LINK'},
          {'Finfo_HP': range(50, 150)},
          {'!correction_': [0],
               0: 'LINK'},
@@ -201,8 +207,8 @@ genes = [{'dilateref_kernel_size': [0]},#[0, 4, 8]},
          ]
 
 #THESE WILL BE BOUNDS AROUND SINGLE VALUE IF GIVEN -> CHANGE SO DOESN'T GO UNDER 5 or over 95
-edge1 = 10
-edge2 = 10
+edge1 = 1
+edge2 = 1
 
 
 map_genes = {}
@@ -352,8 +358,8 @@ def on_pop_gen(ga): #on_generation, on_start, check to make sure not rerunning p
                         construction_key = key_name
                         vars()[dic][node_name][param].append({key_name: mapped})
                     else:
-                        if key_name in links:
-                            if vars()[dic][node_name][param][l][construction_key] not in links[key_name]:
+                        if key_name in links[dic]:
+                            if vars()[dic][node_name][param][l][construction_key] not in links[dic][key_name]:
                                 continue
                             
                         vars()[dic][node_name][param][l][key_name] = mapped

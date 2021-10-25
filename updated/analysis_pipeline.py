@@ -240,8 +240,8 @@ class analysis:
                       #(pre, l1, [('outnode.invwarp', 'inputnode.invwarp'),
                       #           ('outnode.warp_file', 'inputnode.warp')]),
 # =============================================================================
-#                       (inputnode, l1, [('task', 'inputnode.task'),
-#                                        ('mask', 'inputnode.mask')]),
+                     (inputnode, l1, [#('task', 'inputnode.task'),
+                                      ('mask', 'inputnode.mask')]),
 # =============================================================================
                       
                       #(inputnode, l1, [#('discard', 'inputnode.discard'),
@@ -371,9 +371,18 @@ class analysis:
                       (remove_containers, meta, [('bold', 'filename')]),
                       (remove_containers, events, [('bold', 'file')]),
                       (meta, pre, [('TR', 'inputnode.TR')]),
+                      (meta, l1, [('TR', 'inputnode.TR')]),
+                      (pre, l1, [('outnode.smoothed', 'inputnode.smoothed'),
+                                 ('outnode.unsmoothed', 'inputnode.unsmoothed'),
+                                 ('outnode.segmentations', 'inputnode.segmentations'),
+                                 ('outnode.warp_file', 'inputnode.warp_file'),
+                                 ('outnode.outliers', 'inputnode.outliers'),
+                                 ('outnode.brain', 'inputnode.brain'),
+                                 ('outnode.brainmask', 'inputnode.brainmask'),
+                                 ('outnode.invwarp', 'inputnode.invwarp')]),
 # =============================================================================
 #                       (meta, l1, [('TR', 'inputnode.TR')]),
-#                       (events, l1, [('events', 'inputnode.event_file')]),
+                      (events, l1, [('events', 'inputnode.event_file')]),
 #                       (pre, l1, [('outnode.smoothed', 'inputnode.smoothed'),
 #                                  ('outnode.outliers', 'inputnode.outliers'),
 #                                  ('outnode.mc_par', 'inputnode.mc_par'),
