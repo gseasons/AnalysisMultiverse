@@ -23,7 +23,7 @@ class level1(spatial_normalization):
         from updated.l1_analysis.functions import get_sink
         level1 = Workflow('level1')
         level1.base_dir = os.getcwd()
-        inputnode = Node(IdentityInterface(fields=['smoothed', 'unsmoothed', 'brainmask', 'segmentations', 'warp_file', 'outliers', 'brain', 'invwarp',
+        inputnode = Node(IdentityInterface(fields=['smoothed', 'unsmoothed', 'brainmask', 'segmentations', 'warp_file', 'outliers', 'mc_par', 'brain', 'invwarp',
                                                    'event_file', 'TR', 'mask']), name='inputnode')
         
         intermediates = ['cope', 'varcope', 'bold', 'feat_dir', 'seed']
@@ -42,6 +42,7 @@ class level1(spatial_normalization):
                                                                ('segmentations', 'segmentations'),
                                                                ('invwarp', 'invwarp'),
                                                                ('outliers', 'outliers'),
+                                                               ('mc_par', 'mc_par'),
                                                                ]),
                         (inputnode, level1.get_node('l1d'), [('TR', 'interscan_interval')]),
                         (inputnode, level1.get_node('correction'), [('TR', 'TR')]),

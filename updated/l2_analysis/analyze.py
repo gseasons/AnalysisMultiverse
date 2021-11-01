@@ -7,25 +7,7 @@ Created on Thu Oct 21 12:26:40 2021
 """
 from nipype import Workflow, Node, MapNode, Function, IdentityInterface
 from nipype.interfaces.fsl import L2Model, FLAMEO, Merge
-import os
-
-def groupscans(copes, varcopes):
-    outcopes = []
-    outvarcopes = []
-    multiple = type(copes[0])
-    if multiple == list:
-        numcon = len(copes[0])
-    else:
-        return [copes], [varcopes], len(copes)
-        
-    for i in range(numcon):
-        coperuns = [run[i] for run in copes]
-        varcoperuns = [run[i] for run in varcopes]
-        outcopes.append(coperuns)
-        outvarcopes.append(varcoperuns)
-        
-    return outcopes, outvarcopes, numcon
-            
+import os            
 
 class level2:
     def __init__(self, task, pipeline, base_dir):
@@ -33,28 +15,47 @@ class level2:
         self.pipeline = pipeline
         self.base_dir = base_dir
         
-    def construct(self, func_dic):
-        level2 = Workflow('level1')
+    def construct(self):
+        from updated.l2_analysis.functions import get_sink
+        level2 = Workflow('level2')
         level2.base_dir = os.getcwd()
         
         inputnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'mask']), name='inputnode')
+        
+        intermediates = ['copes', 'varcopes', 'flameo_stats']
+        files = []#stats/file
         
         self.l2(level2)
         
         level2.connect([(inputnode, level2.get_node('groupruns'), [('copes', 'copes'),
                                                                    ('varcopes', 'varcopes')]),
-                        (inputnode, level2.get_node('flameo'), [('mask', 'mask')]),
+                        (inputnode, level2.get_node('flameo'), [('mask', 'mask_file')]),
                         ])
         
-        outnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'flameo_stats']))
+        outnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'flameo_stats']), name='outnode')
         
         level2.connect([(level2.get_node('flameo'), outnode, [('copes', 'copes'),
-                                                              ('varcopes', 'varcopes')]),
-                        (level2.get_node('flameo'), outnode, [('flameo_stats', 'flameo_stats')]),
+                                                              ('var_copes', 'varcopes'),
+                                                              ('zstats', 'zstats'),
+                                                              ('stats_dir', 'flameo_stats')]),
                         ])
+        
+        write = Node(Function(input_names=['base_dir', 'pipeline_st', 'task']+intermediates), name='write')
+        write.inputs.function_str = get_sink(intermediates, files)
+        write.inputs.base_dir = self.base_dir
+        write.inputs.pipeline_st = self.pipeline
+        write.inputs.task = self.task
+        
+        level2.connect([(level2.get_node('flameo'), write, [('copes', 'copes'),
+                                                            ('var_copes', 'varcopes'),
+                                                            ('stats_dir', 'flameo_stats')]),
+                        ])
+        
+        return level2
         
         
     def l2(self, flow):
+        from updated.l2_analysis.functions import groupscans
         groupruns = Node(Function(input_names=['copes', 'varcopes'],
                                   output_names=['copes', 'varcopes', 'num_copes'], 
                                   function=groupscans), name='groupruns')

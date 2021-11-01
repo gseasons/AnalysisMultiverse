@@ -5,6 +5,42 @@ Created on Mon Oct 25 16:06:18 2021
 
 @author: grahamseasons
 """
+from updated.functions import insert
+from nipype.utils.functions import getsource
+from updated.workflows import write_out
+import os
+import re
+
+def group_contrast(copes, varcopes):
+    outcopes = []
+    outvarcopes = []
+    multiple = type(copes[0])
+    if multiple == list:
+        numcon = len(copes[0])
+    else:
+        return [copes], [varcopes]
+        
+    for i in range(numcon):
+        subcopes = [sub[i] for sub in copes]
+        subvarcopes = [sub[i] for sub in varcopes]
+        outcopes.append(subcopes)
+        outvarcopes.append(subvarcopes)
+        
+    return outcopes, outvarcopes
+
+def remove_container(cont):
+    if isinstance(cont, list) and isinstance(cont[0], list) and len(cont) == 1:
+        return cont[0]
+    else:
+        return cont
+    
+def mniMask(mask):
+    old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+    if mask == old:
+        mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain_mask_dil1.nii.gz')
+    
+    return mask
+
 def t_test(covariate, subjects):
     import pandas as pd
     #import numpy as np
@@ -71,3 +107,28 @@ def t_test(covariate, subjects):
         
             
     return EVs, contrasts, group_ids
+
+
+def get_sink(inputs, files):
+    if type(files) != list:
+        files = [files]
+        
+    func_str = getsource(write_out)
+    ind = func_str.find('):')
+    params = ', ' + ', '.join(inputs)
+    func_str = insert(func_str, ind, params)
+    
+    search = re.search('\n(\n)(\s+)(setattr)', func_str)
+    ind = search.start(1)
+    
+    block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["if isinstance(vars()[out], str) and os.path.isdir(vars()[out]):\n",
+        "for file in {files}:\n",
+        "    file_out = vars()[out] + '/' + file\n",
+        "    if os.path.isdir(file_out) or os.path.isfile(file_out):\n",
+        "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, file_out)\n"])
+        
+    func_str = insert(func_str, search.start(3), "\n    "+search.group(2))
+    func_str = insert(func_str, search.start(3), "else:")
+    func_str = insert(func_str, ind, block)
+        
+    return func_str.format(files=str(files))

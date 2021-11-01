@@ -5,7 +5,7 @@ Created on Mon Oct  4 12:50:07 2021
 
 @author: grahamseasons
 """
-def smooth(warped, mask):#, susan, fwhm):
+def smooth(warped, mask):
     #WORKFLOW ADAPTED FROM: https://nipype.readthedocs.io/en/latest/users/examples/fmri_fsl.html
     from nipype import Workflow, Node, IdentityInterface
     from nipype.interfaces.base import Undefined
@@ -25,8 +25,6 @@ def smooth(warped, mask):#, susan, fwhm):
     outnode = Node(IdentityInterface(fields=['smoothed']), name='outnode')
     
     if susan:
-        #meanfunc = Node(ImageMaths(op_string='-Tmean', suffix='_mean'), name='meanfunc')
-        #meanfuncmask = Node(BET(mask=True, no_output=True, frac=0.3), name='meanfuncmask')
         maskfunc = Node(ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask), name='maskfunc')
         getthresh = Node(ImageStats(op_string='-p 2 -p 98'), name='getthreshold')
         threshold = Node(ImageMaths(out_data_type='char', suffix='_thresh'), name='threshold')
@@ -35,10 +33,7 @@ def smooth(warped, mask):#, susan, fwhm):
         
         smooth_su = Node(SUSAN(fwhm=fwhm), name='smooth_su')
         
-        smooth.connect([#(inputnode, meanfunc, [('in_file', 'in_file')]),
-                        #(meanfunc, meanfuncmask, [('out_file', 'in_file')]),
-                        (inputnode, maskfunc, [('in_file', 'in_file')]),
-                        #(meanfuncmask, maskfunc, [('mask_file', 'in_file2')]),
+        smooth.connect([(inputnode, maskfunc, [('in_file', 'in_file')]),
                         (maskfunc, getthresh, [('out_file', 'in_file')]),
                         (maskfunc, threshold, [('out_file', 'in_file')]),
                         (getthresh, threshold, [(('out_stat', getthreshop), 'op_string')]),
@@ -61,7 +56,7 @@ def smooth(warped, mask):#, susan, fwhm):
         
     return smoothed, glob.glob(os.getcwd() + '/smooth/**', recursive=True)
                         
-def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_thresh, warplater):
+def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
     from nipype.interfaces.fsl import FLIRT
     from nipype.interfaces.base import Undefined
     from nipype import IdentityInterface
@@ -74,8 +69,6 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
     
     bbr = vars().get('bbr', True)
     concatenate = vars().get('concatenate', True)
-    #wmthresh = vars().get('wmthresh', True)
-    #warplater = vars().get('warplater', True)
     
     regpre = Node(FLIRT(in_file=start_img, reference=bet, output_type='NIFTI_GZ'), name='regpre')
     
@@ -87,10 +80,8 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
         regbbr = Node(FLIRT(cost='bbr', reference=T1w, in_file=start_img, output_type='NIFTI_GZ',
                         schedule=opj(os.getenv('FSLDIR'), 'etc/flirtsch/bbr.sch')), name='regbbr')
         regbbr.inputs.wm_seg = wm_file
-        #threshold = Node(Threshold(thresh=wmthresh, in_file=wm_file, args='-bin', output_type='NIFTI_GZ'), name="threshold")
-        reg.connect([#(threshold, regbbr, [('out_file', 'wm_seg')]),
-                     (regpre, regbbr, [('out_matrix_file', 'in_matrix_file')]),
-                     #(regbbr, applywarp, [('out_matrix_file', 'in_matrix_file')]),
+        
+        reg.connect([(regpre, regbbr, [('out_matrix_file', 'in_matrix_file')]),
                      (regbbr, outnode, [('out_matrix_file', 'out_mat')]),
                      ])
         
@@ -99,8 +90,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
             
         node_reg = 'regbbr'
     else:
-        reg.connect([#(regpre, applywarp, [('out_matrix_file', 'in_matrix_file')]),
-                     (regpre, outnode, [('out_matrix_file', 'out_mat')]),
+        reg.connect([(regpre, outnode, [('out_matrix_file', 'out_mat')]),
                      ])
         
         if not concatenate:
@@ -120,7 +110,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):#, bbr, wm_t
         
     return out_mat, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
 
-#SHOULD PROBABLY GET RID OF OUTLIERS HERE
+
 def regress(unsmoothed, mc_par, segmentations, mask):
     from nipype import Node
     from nipype.interfaces.base import Undefined
@@ -129,15 +119,15 @@ def regress(unsmoothed, mc_par, segmentations, mask):
     from nipype.interfaces.base import CommandLine
     import numpy as np
     import nibabel as nib
-    #from scipy import stats
     import os, re
     
     CSF = vars().get('CSF', True)
     WM = vars().get('WM', True)
     GLOBAL = vars().get('GLOBAL', True)
     params = np.loadtxt(mc_par)
+    reho = np.loadtxt(mc_par)
     
-    if not vars().get('realignregress', False):
+    if not vars().get('realignregress', True):
         params = np.zeros((params.shape[0], 1))
         
     resample = False
@@ -146,38 +136,52 @@ def regress(unsmoothed, mc_par, segmentations, mask):
     reference = Node(MeanImage(in_file=unsmoothed, dimension='T'), name='reference').run().outputs.out_file
     if nib.load(unsmoothed).shape[0:-1] != nib.load(mask).shape:
         resample = True
+
+    csfmask = segmentations[0]
+    csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+    if resample:
+        csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask').run().outputs.out_file
+    meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf')
+    csf = np.loadtxt(meancsf.run().outputs.out_file).reshape(-1, 1)
+    reho = np.hstack((reho, csf))
     
     if CSF:
-        csfmask = segmentations[0]
-        csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
-        if resample:
-            csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask').run().outputs.out_file
-        meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf')
-        csf = np.loadtxt(meancsf.run().outputs.out_file).reshape(-1, 1)
         params = np.hstack((params, csf))
         suffix += 'CSF_'
+        
+    wmmask = segmentations[2]
+    wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+    if resample:
+        wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask').run().outputs.out_file
+    meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf')
+    wm = np.loadtxt(meanwm.run().outputs.out_file).reshape(-1, 1)
+    reho = np.hstack((reho, wm))
+    
     if WM:
-        wmmask = segmentations[2]
-        wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
-        if resample:
-            wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask').run().outputs.out_file
-        meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf')
-        wm = np.loadtxt(meanwm.run().outputs.out_file).reshape(-1, 1)
         params = np.hstack((params, wm))
         suffix += 'WM_'
+            
     if GLOBAL:
         meanglob = Node(ImageMeants(in_file=unsmoothed, mask=mask), name='meanglob')
         glob = np.loadtxt(meanglob.run().outputs.out_file).reshape(-1, 1)
         params = np.hstack((params, glob))
+        reho = np.hstack((reho, glob))
         suffix += 'GLOBAL'
         
     name_ = os.getcwd() + '/' + suffix
-    #params = stats.zscore(params)
+    
     np.savetxt(name_ + '.txt', params)
     cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_)
     cl = CommandLine(cmd)
     cl.run().runtime
     
+    name_reho = os.getcwd() + '/' + suffix + '_reho'
+    np.savetxt(name_ + '.txt', params)
+    cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_reho)
+    cl = CommandLine(cmd)
+    cl.run().runtime
+    
+    forreho = unsmoothed.copy()
     if np.any(params):
         out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
@@ -185,8 +189,16 @@ def regress(unsmoothed, mc_par, segmentations, mask):
         regressed = glm.run().outputs.out_res
         add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
         unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+        
+    if np.any(reho):
+        out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
+        glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
     
-    return unsmoothed
+        regressed = glm.run().outputs.out_res
+        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+        forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+        
+    return unsmoothed, forreho
 
 def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat):
     from nipype.interfaces.fsl import ApplyWarp, ConvertWarp, Threshold, ConvertXFM, FLIRT

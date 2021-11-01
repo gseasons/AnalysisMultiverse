@@ -7,14 +7,12 @@ Created on Thu Sep 30 13:29:04 2021
 """
 from updated.normalization.spatial_normalization import spatial_normalization
 from nipype import Workflow, Node, IdentityInterface, Function
-from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, BET, FAST, FilterRegressor, GLM, UnaryMaths
+from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, FAST, UnaryMaths
 from nipype.algorithms.rapidart import ArtifactDetect
 import os
 from updated.preprocessing.functions import get_wm, get_sink
 from niworkflows.anat.ants import init_brain_extraction_wf
 from niworkflows.func.util import init_enhance_and_skullstrip_bold_wf
-
-
 
 class preprocess(spatial_normalization):
     def __init__(self, task, pipeline, base_dir):
@@ -52,7 +50,7 @@ class preprocess(spatial_normalization):
                             (preprocess.get_node('warp'), preprocess.get_node('Fmni'), [('field_file', 'warp')]),
                             ])
         
-        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'outliers', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'outliers', 'mc_par', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
         
         preprocess.connect([(preprocess.get_node('bet_strip'), outnode, [('out_file', 'brain')]),
                             (preprocess.get_node('Fmni'), outnode, [('segmentations', 'segmentations')]),
@@ -61,7 +59,7 @@ class preprocess(spatial_normalization):
                             #(preprocess.get_node('warp'), outnode, [('field_file', 'warp_file')]),
                             (preprocess.get_node('Fmni'), outnode, [('warp', 'warp_file')]),
                             (preprocess.get_node('invwarp'), outnode, [('invwarp', 'invwarp')]),
-                            #(preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
+                            (preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
                             (preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
                             #(preprocess.get_node('Fregistration'), outnode, [('out_mat', 'coregmat')]),
                             (preprocess.get_node('Fregistration'), outnode, [('files', 'keepreg')]),
@@ -69,7 +67,7 @@ class preprocess(spatial_normalization):
                             ])
         
         if 'rest' in self.task:
-            preprocess.connect([(preprocess.get_node('Fregress'), outnode, [('warped', 'unsmoothed')]),
+            preprocess.connect([(preprocess.get_node('Fregress'), outnode, [('forreho', 'unsmoothed')]),
                                 ])
         else:
             preprocess.connect([(preprocess.get_node('Fmni'), outnode, [('warped', 'unsmoothed')]),
@@ -101,7 +99,7 @@ class preprocess(spatial_normalization):
         
         extract = Node(ExtractROI(t_size=-1, output_type='NIFTI_GZ'), name='extract')
         mcflirt = Node(MCFLIRT(save_plots=True, output_type='NIFTI_GZ'), name='mcflirt')
-        #TURN ON/OFF
+        
         slicetimer = Node(SliceTimer(index_dir=False, interleaved=True, output_type='NIFTI_GZ'), name='slicetimer')
             
         func_str, input_names = function_str('smooth', func_dic)
@@ -113,7 +111,7 @@ class preprocess(spatial_normalization):
                                  output_names=['start_img', 'corrected_img', 'mask'], function=decision), name='decision')
         decision.inputs.mean_vol = ''
         decision.inputs.st = ''
-        #NOTE: RIGHT NOW A WARP TO STANDARD SPACE MESSES THINGS UP WITH SEGMENTATION, ETC. -> PUT TOSTD IN OWN NODE, WARP SEGMENTATIONS, BRAINMASK, BOLD
+        
         art = Node(ArtifactDetect(norm_threshold=2,
                                   zintensity_threshold=3,
                                   mask_type='spm_global',
@@ -127,7 +125,7 @@ class preprocess(spatial_normalization):
         if 'rest' in self.task:
             func_str, input_names = function_str('regress', func_dic)
             Fregress = Node(Function(input_names=input_names,
-                                     output_names=['warped']), name='Fregress')
+                                     output_names=['warped', 'forreho']), name='Fregress')
             Fregress.inputs.function_str = func_str
             
             flow.connect([(flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
@@ -161,7 +159,6 @@ class preprocess(spatial_normalization):
         from updated.preprocessing.functions import function_str, strip_container
         bet = init_brain_extraction_wf(name='bet')
         bet_strip = Node(Function(input_names='in_file', output_names='out_file', function=strip_container), name='bet_strip')
-        #bet = Node(BET(output_type='NIFTI_GZ'), name='bet')
         fast = Node(FAST(output_type='NIFTI_GZ', segments=True), name='fast')
         
         func_str, input_names = function_str('registration', func_dic)

@@ -12,9 +12,14 @@ def write_out(base_dir, pipeline_st, task):
     import re, os
     sink = Node(DataSink(base_directory=base_dir, parameterization=True), name='sink')
     folder_name = task
-    session = re.search('/(_sessions_[A-Za-z0-9]+)/', vars()[outputs[0]])
-    run = re.search('/(_runs_[0-9]+)/', vars()[outputs[0]])
-    subject = re.search('/(_subject_[0-9A-Za-z]+/)', vars()[outputs[0]]).group(1)
+    test_str = vars()[outputs[0]]
+    if isinstance(test_str, list):
+        test_str = test_str[0]
+        if isinstance(test_str, list):
+            test_str = test_str[0]
+    session = re.search('/(_sessions_[A-Za-z0-9]+)/', test_str)
+    run = re.search('/(_runs_[0-9]+)/', test_str)
+    #subject = re.search('/(_subject_[0-9A-Za-z]+/)', test_str).group(1)
     
     if session:
         folder_name += '/' + session.group(1) + '/'

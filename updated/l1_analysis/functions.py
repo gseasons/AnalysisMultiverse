@@ -13,7 +13,7 @@ import re
 def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     from nipype import Node
     from nipype.interfaces.afni.utils import ReHo
-    from nipype.interfaces.fsl.maths import TemporalFilter, Threshold#, UnaryMaths
+    from nipype.interfaces.fsl.maths import TemporalFilter, Threshold
     from nipype.interfaces.fsl import IsotropicSmooth
     
     bpfilter = Node(TemporalFilter(in_file=unsmoothed), name='bpfilter')
@@ -25,7 +25,7 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     filtered = IsotropicSmooth(fwhm=6, in_file=filtered).run().outputs.out_file
     reho = Node(ReHo(in_file=filtered), name='reho')
     reho.inputs.neighborhood = k
-    reho.inputs.mask_file = mask#Node(UnaryMaths(in_file=mask, operation='bin'), name='binmask').run().outputs.out_file
+    reho.inputs.mask_file = mask
     rehomap = reho.run().outputs.out_file
     
     thresh = Node(Threshold(in_file=rehomap, args='-bin'), name='thresh')
@@ -36,9 +36,9 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
 def warp(in_file, ref, warp):
     from nipype import Node
     from nipype.interfaces.fsl import ApplyWarp
-    mni = Node(ApplyWarp(ref_file=ref, field_file=warp), name='mni')
-    mni.inputs.in_file = in_file
-    return mni.run().outputs.out_file
+    warped = Node(ApplyWarp(ref_file=ref, field_file=warp), name='warped')
+    warped.inputs.in_file = in_file
+    return warped.run().outputs.out_file
 
 def invert(warp, brain):
     from nipype import Node
@@ -99,11 +99,11 @@ def get_sink(inputs, files):
     search = re.search('\n(\n)(\s+)(setattr)', func_str)
     ind = search.start(1)
     
-    block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["if isinstance(out, str) and os.path.isdir(out):\n",
+    block = '\n' + search.group(2) + (search.group(2) + search.group(2)).join(["if isinstance(vars()[out], str) and os.path.isdir(vars()[out]):\n",
         "for file in {files}:\n",
-        "    file = out + '/' + file\n",
-        "    if os.path.isdir(file) or os.path.isfile(file):\n",
-        "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, vars()[file])\n"])
+        "    file_out = vars()[out] + '/' + file\n",
+        "    if os.path.isdir(file_out) or os.path.isfile(file_out):\n",
+        "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, file_out)\n"])
         
     func_str = insert(func_str, search.start(3), "\n    "+search.group(2))
     func_str = insert(func_str, search.start(3), "else:")
