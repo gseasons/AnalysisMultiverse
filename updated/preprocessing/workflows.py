@@ -111,7 +111,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
     return out_mat, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
 
 
-def regress(unsmoothed, mc_par, segmentations, mask):
+def regress(unsmoothed, mc_par, outliers, segmentations, mask, rest):
     from nipype import Node
     from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
@@ -121,14 +121,27 @@ def regress(unsmoothed, mc_par, segmentations, mask):
     import nibabel as nib
     import os, re
     
-    CSF = vars().get('CSF', True)
-    WM = vars().get('WM', True)
-    GLOBAL = vars().get('GLOBAL', True)
+    if rest:
+        CSF = vars().get('CSF', True)
+        WM = vars().get('WM', True)
+        GLOBAL = vars().get('GLOBAL', True)
+    else:
+        CSF = vars().get('CSF', False)
+        WM = vars().get('WM', False)
+        GLOBAL = vars().get('GLOBAL', False)
+        
     params = np.loadtxt(mc_par)
     reho = np.loadtxt(mc_par)
     
     if not vars().get('realignregress', True):
         params = np.zeros((params.shape[0], 1))
+        
+    outlier = np.loadtxt(outliers)
+    if outlier.size > 0:
+        for o in outlier:
+            append = np.zeros((params.shape[0], 1))
+            append[o] = 1
+            params.hstack((params, append))
         
     resample = False
     suffix = ''

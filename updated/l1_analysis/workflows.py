@@ -6,7 +6,7 @@ Created on Thu Oct 14 10:50:42 2021
 @author: grahamseasons
 """
 
-def info(mask, task, TR, event_file, unsmoothed, smoothed, outliers, mc_par, brain, brainmask, segmentations, invwarp, network):
+def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, segmentations, invwarp, network):
     from nipype import Node
     from versatile import SpecifyModelVersatile
     from nipype.interfaces.fsl import ImageMeants, ExtractROI, ImageMaths, BinaryMaths, WarpPoints
@@ -17,14 +17,11 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, outliers, mc_par, bra
     from updated.l1_analysis.functions import data_driven, warp
     
     model = Node(SpecifyModelVersatile(input_units='secs', parameter_source='FSL'), name='model')
-    model.inputs.outlier_files = outliers
     model.inputs.time_repetition = TR
     model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
     model.inputs.functional_runs = smoothed
     
     if event_file:
-        if vars().get('realignregress', True):
-            model.inputs.realignment_parameters = mc_par
         model.inputs.bids_event_file = event_file
         session_info = model.run().outputs.session_info
         

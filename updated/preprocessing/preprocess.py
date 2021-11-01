@@ -50,7 +50,7 @@ class preprocess(spatial_normalization):
                             (preprocess.get_node('warp'), preprocess.get_node('Fmni'), [('field_file', 'warp')]),
                             ])
         
-        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'outliers', 'mc_par', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
         
         preprocess.connect([(preprocess.get_node('bet_strip'), outnode, [('out_file', 'brain')]),
                             (preprocess.get_node('Fmni'), outnode, [('segmentations', 'segmentations')]),
@@ -59,8 +59,8 @@ class preprocess(spatial_normalization):
                             #(preprocess.get_node('warp'), outnode, [('field_file', 'warp_file')]),
                             (preprocess.get_node('Fmni'), outnode, [('warp', 'warp_file')]),
                             (preprocess.get_node('invwarp'), outnode, [('invwarp', 'invwarp')]),
-                            (preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
-                            (preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
+                            #(preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
+                            #(preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
                             #(preprocess.get_node('Fregistration'), outnode, [('out_mat', 'coregmat')]),
                             (preprocess.get_node('Fregistration'), outnode, [('files', 'keepreg')]),
                             (preprocess.get_node('fillmask'), outnode, [('out_file', 'brainmask')]),
@@ -122,24 +122,16 @@ class preprocess(spatial_normalization):
         
         fillmask = Node(UnaryMaths(operation='fillh'), name='fillmask')
         
-        if 'rest' in self.task:
-            func_str, input_names = function_str('regress', func_dic)
-            Fregress = Node(Function(input_names=input_names,
-                                     output_names=['warped', 'forreho']), name='Fregress')
-            Fregress.inputs.function_str = func_str
-            
-            flow.connect([(flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
-                          (flow.get_node('Fmni'), Fregress, [('brainmask', 'mask')]),
-                          (flow.get_node('Fmni'), Fregress, [('segmentations', 'segmentations')]),
-                          (mcflirt, Fregress, [('par_file', 'mc_par')]),
-                          (Fregress, Fsmooth, [('warped', 'warped')]),
-                          (fillmask, Fsmooth, [('out_file', 'mask')]),
-                          ])
-        else:
-            flow.connect([(flow.get_node('Fmni'), Fsmooth, [('warped', 'warped')]),
-                          (fillmask, Fsmooth, [('out_file', 'mask')]),
-                          ])
+        func_str, input_names = function_str('regress', func_dic)
+        Fregress = Node(Function(input_names=input_names,
+                                 output_names=['warped', 'forreho']), name='Fregress')
+        Fregress.inputs.function_str = func_str
         
+        if 'rest' in self.task:
+            Fregress.inputs.rest = True
+        else:
+            Fregress.inputs.rest = False
+            
         flow.connect([(extract, mcflirt, [('roi_file', 'in_file')]),
                       (mcflirt, slicetimer, [('out_file', 'in_file')]),
                       (mcflirt, decision, [('mean_img', 'mean_vol'),
@@ -153,6 +145,13 @@ class preprocess(spatial_normalization):
                       (decision, flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
                       (flow.get_node('boldmask'), fillmask, [('outputnode.skull_stripped_file', 'in_file')]),
                       (flow.get_node('Fregistration'), art, [('warped', 'realigned_files')]),
+                      (flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
+                      (flow.get_node('Fmni'), Fregress, [('brainmask', 'mask')]),
+                      (flow.get_node('Fmni'), Fregress, [('segmentations', 'segmentations')]),
+                      (art, Fregress, [('outlier_files', 'outliers')]),
+                      (mcflirt, Fregress, [('par_file', 'mc_par')]),
+                      (Fregress, Fsmooth, [('warped', 'warped')]),
+                      (fillmask, Fsmooth, [('out_file', 'mask')]),
                       ])
         
     def coregistration(self, flow, func_dic):

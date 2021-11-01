@@ -45,7 +45,7 @@ links = {'preprocess': {
          'hp': ['data'],
          'Finfo_warppostfeat': 'Fmni_warplater',
          'Finfo_concatenate': 'Fregistration_concatenate',
-         'Finfo_realignregress': 'Fregress_realignregress',
+         #'Finfo_realignregress': 'Fregress_realignregress',
          'correction_discard': 'extract_t_min',
          'applywarpcopes_interp': 'Fmni_warped_interp',
          'applywarpvarcopes_interp': 'Fmni_warped_interp',
@@ -269,7 +269,8 @@ def on_pop_gen(ga): #on_generation, on_start, check to make sure not rerunning p
             multiscan = True
         else:
             multiscan = False
-            
+        #ALTER SO THAT CHECKS AGAINST DICTIONARY TO SEE WHAT VALUES ARE EXCLUSIVE FOR RESTING STATE -> IGNORES THEM IN TASK
+        #NAME AND DEFAULT VALUE
         master, expand_inputs = generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle)
         
         if 'anat' in types and 'func' in types:
