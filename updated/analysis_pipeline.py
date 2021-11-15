@@ -188,7 +188,7 @@ class analysis:
                       (meta, l1, [('TR', 'inputnode.TR')]),
                       (pre, l1, [('outnode.segmentations', 'inputnode.segmentations'),
                                  ('outnode.warp_file', 'inputnode.warp_file'),
-                                 #('outnode.outliers', 'inputnode.outliers'),
+                                 ('outnode.outliers', 'inputnode.outliers'),
                                  ('outnode.brain', 'inputnode.brain'),
                                  ('outnode.brainmask', 'inputnode.brainmask'),
                                  ('outnode.invwarp', 'inputnode.invwarp')]),

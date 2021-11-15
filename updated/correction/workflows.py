@@ -9,6 +9,7 @@ def FDR(zstat, mask, cor):
     from updated.correction.functions import fdr
     from nipype import MapNode, Function
     from nipype.interfaces.fsl import ImageMaths, Threshold, BinaryMaths
+    import os
     
     cor['q'] = cor.pop('p')
 
@@ -62,9 +63,15 @@ def FDR(zstat, mask, cor):
     flip.inputs.in_file = corrected_neg
     corrected_neg = flip.run().outputs.out_file
     
-    corrected_all = MapNode(BinaryMaths(operation='add'), name='corrected_all', iterfield=['in_file', 'operand_file'], nested=True)
+    corrected_all = MapNode(BinaryMaths(operation='add'), name='corrected_all', iterfield=['in_file', 'operand_file', 'out_file'], nested=True)
     corrected_all.inputs.in_file = corrected_pos
     corrected_all.inputs.operand_file = corrected_neg
+    
+    out_names = []
+    for i in range(len(corrected_pos)):
+        out_names.append(os.getcwd()+'/fdr_corrected_{i}.nii.gz'.format(i=i))
+        
+    corrected_all.inputs.out_file = out_names
     
     return corrected_all.run().outputs.out_file
 
@@ -72,6 +79,7 @@ def FWE(zstat, mask, cor):
     from updated.correction.functions import fwe, neg
     from nipype import MapNode, Function
     from nipype.interfaces.fsl import SmoothEstimate, Threshold, BinaryMaths
+    import os
     
     smoothness = MapNode(SmoothEstimate(mask_file=mask), 
                          name='smoothness', iterfield=['zstat_file'], nested=True)
@@ -95,9 +103,15 @@ def FWE(zstat, mask, cor):
     fwe_nonsig1.inputs.thresh = neg(thresh)
     neg = fwe_nonsig1.run().outputs.out_file
     
-    fwe_thresh = MapNode(BinaryMaths(operation='sub'), name='fwe_thresh', iterfield=['in_file', 'operand_file'], nested=True)
+    fwe_thresh = MapNode(BinaryMaths(operation='sub'), name='fwe_thresh', iterfield=['in_file', 'operand_file', 'out_file'], nested=True)
     fwe_thresh.inputs.in_file = zstat
     fwe_thresh.inputs.operand_file = neg
+    
+    out_names = []
+    for i in range(len(zstat)):
+        out_names.append(os.getcwd()+'/fwe_corrected_{i}.nii.gz'.format(i=i))
+        
+    fwe_thresh.inputs.out_file = out_names
     
     return fwe_thresh.run().outputs.out_file
 
@@ -105,6 +119,7 @@ def clusterFWE(zstat, copes, mask, cor):
     #RETURNS CORRECTED 1-P IMAGE
     from nipype import MapNode
     from nipype.interfaces.fsl import SmoothEstimate, Cluster, BinaryMaths
+    import os
     
     smoothness = MapNode(SmoothEstimate(mask_file=mask), 
                          name='smoothness', iterfield=['zstat_file'], nested=True)
@@ -143,11 +158,18 @@ def clusterFWE(zstat, copes, mask, cor):
                           name='cluster_inv', iterfield=['in_file'], nested=True)
     cluster_inv.inputs.in_file = cluster_neg
     cluster_inv = cluster_inv.run().outputs.out_file
-    
+        
     cluster_all = MapNode(BinaryMaths(operation='add'), 
-                          name='cluster_all', iterfield=['in_file', 'operand_file'], nested=True)
+                          name='cluster_all', iterfield=['in_file', 'operand_file', 'out_file'], nested=True)
     cluster_all.inputs.in_file = cluster_pos
     cluster_all.inputs.operand_file = cluster_inv
+    
+    out_names = []
+    for i in range(len(cluster_pos)):
+        out_names.append(os.getcwd()+'/cluster_corrected_{i}.nii.gz'.format(i=i))
+        
+    cluster_all.inputs.out_file = out_names
+    
     cluster_all = cluster_all.run().outputs.out_file
     
     return cluster_all

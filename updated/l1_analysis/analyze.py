@@ -7,7 +7,7 @@ Created on Wed Oct 13 11:36:22 2021
 """
 from updated.normalization.spatial_normalization import spatial_normalization
 from nipype import Workflow, Node, Function, IdentityInterface
-from versatile import Level1DesignVersatile
+from updated.versatile import Level1DesignVersatile
 from nipype.interfaces.fsl import FEAT
 import os
 
@@ -23,7 +23,7 @@ class level1(spatial_normalization):
         from updated.l1_analysis.functions import get_sink
         level1 = Workflow('level1')
         level1.base_dir = os.getcwd()
-        inputnode = Node(IdentityInterface(fields=['smoothed', 'unsmoothed', 'brainmask', 'segmentations', 'warp_file', 'brain', 'invwarp',
+        inputnode = Node(IdentityInterface(fields=['smoothed', 'unsmoothed', 'brainmask', 'outliers', 'segmentations', 'warp_file', 'brain', 'invwarp',
                                                    'event_file', 'TR', 'mask']), name='inputnode')
         
         intermediates = ['cope', 'varcope', 'bold', 'feat_dir', 'seed']
@@ -39,6 +39,7 @@ class level1(spatial_normalization):
                                                                ('unsmoothed', 'unsmoothed'),
                                                                ('brainmask', 'brainmask'),
                                                                ('brain', 'brain'),
+                                                               ('outliers', 'outliers'),
                                                                ('segmentations', 'segmentations'),
                                                                ('invwarp', 'invwarp'),
                                                                ]),
@@ -70,8 +71,8 @@ class level1(spatial_normalization):
         
         level1.connect([(level1.get_node('feat'), write, [('feat_dir', 'feat_dir')]),
                         (level1.get_node('ret'), write, [('cope', 'cope'),
-                                                         ('varcope', 'varcope'),
-                                                         ('bold', 'bold')]),
+                                                         ('varcope', 'varcope')]),
+                                                         #('bold', 'bold')]),
                         ])
         
         if 'rest' in self.task:

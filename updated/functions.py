@@ -144,7 +144,7 @@ def generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle):
                     if not isint:
                         rand = random.Random(i)
                         if type(mapped) == list:
-                            mapped = [(m[0], rand.randint(m[1]-wiggle if m[1]-wiggle > 0 else 0, m[1]+wiggle if m[1]+wiggle > 95 else 95)) if len(m) == 2 and isinstance(m, (tuple,list)) else (m[0], rand.randint(m[1], m[2])) if isinstance(m, (tuple,list)) else m if isinstance(m, str) else invalid(param+'_'+key_name) for m in mapped]
+                            mapped = [(m[0], rand.randint(int(m[1])-wiggle if int(m[1])-wiggle > 0 else 0, int(m[1])+wiggle if int(m[1])+wiggle > 95 else 95)) if len(m) == 2 and isinstance(m, (tuple,list)) else (m[0], rand.randint(int(m[1]), int(m[2]))) if isinstance(m, (tuple,list)) else m if isinstance(m, str) else invalid(param+'_'+key_name) for m in mapped]
 # =============================================================================
 #                             if type(mapped[0]) == tuple or type(mapped[0]) == list:
 #                                 mapped = [(m[0], rand.randint(m[1]-wiggle if m[1]-wiggle > 0 else 0, m[1]+wiggle if m[1]+wiggle > 95 else 95)) if len(m) == 2 else (m[0], rand.randint(m[1], m[2])) for m in mapped]
@@ -281,6 +281,7 @@ def get_links(dic, keys):
                 pipeline_keys.remove('id')
             else:
                 pipeline_keys = list(sub_dic[key].keys())
+                pipeline_keys.remove('id')
                 if pipeline_keys[0] not in connections:
                     connections[pipeline_keys[0]] = {}
                 connections[pipeline_keys[0]][key] = [key]
@@ -323,6 +324,12 @@ def get_links(dic, keys):
                         
                         if k not in connections[node][link_key]:
                             connections[node][link_key].append(k)
+                else:
+                    pipeline_keys = list(sub_dic[key].keys())
+                    pipeline_keys.remove('id')
+                    if pipeline_keys[0] not in connections:
+                        connections[pipeline_keys[0]] = {}
+                    connections[pipeline_keys[0]][key] = [key]
     
     return list(dict.fromkeys(nodes)), add_mapping(connections)
 

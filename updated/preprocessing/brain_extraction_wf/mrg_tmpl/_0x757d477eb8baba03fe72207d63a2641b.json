@@ -1,0 +1,34 @@
+[
+    [
+        "axis",
+        "vstack"
+    ],
+    [
+        "in1",
+        [
+            "/Users/grahamseasons/.cache/templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz",
+            "67cc0898cf2534565ce019c66b21a2cc"
+        ]
+    ],
+    [
+        "in2",
+        [
+            "/Users/grahamseasons/fMRI/analysis_multiverse/updated/preprocessing/brain_extraction_wf/lap_tmpl/tpl-OASIS30ANTs_res-01_T1w_maths.nii.gz",
+            "1740b77722415525790d9cf3cc2f038c"
+        ]
+    ],
+    [
+        "no_flatten",
+        false
+    ],
+    [
+        "ravel_inputs",
+        false
+    ],
+    [
+        "needed_outputs",
+        [
+            "out"
+        ]
+    ]
+]

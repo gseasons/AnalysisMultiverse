@@ -5,19 +5,46 @@ Created on Mon Oct  4 12:50:07 2021
 
 @author: grahamseasons
 """
+def check4brains(out_dir, T1w):
+    from nipype import SelectFiles
+    from niworkflows.anat.ants import init_brain_extraction_wf
+    import re, os, glob
+    
+    sID = re.search('sub-([0-9S]+)', T1w)
+    if sID:
+        sID = sID.group(1)
+    else:
+        raise NameError('Subject ID not found. ID should be composed of digits, with one letter (S) allowed')
+    
+    templates = {'bet': out_dir + '/pipelines/rest2/_subject_{sID}/_apply_mask0/*.nii.gz'.format(sID=sID)}
+    try:
+        selectfiles = SelectFiles(templates, sort_filelist=True, force_lists=['bet']).run().outputs.bet
+    except:
+        selectfiles = []
+        
+    if selectfiles:
+        return selectfiles
+    
+    wf = init_brain_extraction_wf()
+    wf.base_dir = os.getcwd()
+    wf.inputs.inputnode.in_files = T1w
+    wf.run()
+    
+    return glob.glob(os.getcwd() + '/apply_mask/mapflow/_apply_mask0/*.nii*')
+
 def smooth(warped, mask):
     #WORKFLOW ADAPTED FROM: https://nipype.readthedocs.io/en/latest/users/examples/fmri_fsl.html
     from nipype import Workflow, Node, IdentityInterface
     from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import (BET, ImageMaths, ImageStats, SUSAN, IsotropicSmooth)
     import os, glob, re
-    from functions import get_bright_thresh, getthreshop
+    from updated.preprocessing.functions import get_bright_thresh, getthreshop
     
     smooth = Workflow('smooth')
     smooth.base_dir = os.getcwd()
     
     susan = vars().get('susan', True)
-    fwhm = vars().get('fwhm', 4)
+    fwhm = vars().get('fwhm', 6)
     
     inputnode = Node(IdentityInterface(fields=['in_file']), name='inputnode')
     inputnode.inputs.in_file = warped
@@ -111,7 +138,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
     return out_mat, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
 
 
-def regress(unsmoothed, mc_par, outliers, segmentations, mask, rest):
+def regress(unsmoothed, mc_par, segmentations, mask, rest):
     from nipype import Node
     from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
@@ -135,13 +162,6 @@ def regress(unsmoothed, mc_par, outliers, segmentations, mask, rest):
     
     if not vars().get('realignregress', True):
         params = np.zeros((params.shape[0], 1))
-        
-    outlier = np.loadtxt(outliers)
-    if outlier.size > 0:
-        for o in outlier:
-            append = np.zeros((params.shape[0], 1))
-            append[o] = 1
-            params.hstack((params, append))
         
     resample = False
     suffix = ''
@@ -190,11 +210,11 @@ def regress(unsmoothed, mc_par, outliers, segmentations, mask, rest):
     
     name_reho = os.getcwd() + '/' + suffix + '_reho'
     np.savetxt(name_ + '.txt', params)
-    cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_reho)
+    cmd = ('Text2Vest {name_}.txt {name_reho}.mat').format(name_=name_, name_reho=name_reho)
     cl = CommandLine(cmd)
     cl.run().runtime
     
-    forreho = unsmoothed.copy()
+    forreho = unsmoothed
     if np.any(params):
         out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)

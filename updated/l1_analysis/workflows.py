@@ -6,12 +6,12 @@ Created on Thu Oct 14 10:50:42 2021
 @author: grahamseasons
 """
 
-def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, segmentations, invwarp, network):
+def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, outliers, segmentations, invwarp, network):
     from nipype import Node
-    from versatile import SpecifyModelVersatile
+    from updated.versatile import SpecifyModelVersatile
     from nipype.interfaces.fsl import ImageMeants, ExtractROI, ImageMaths, BinaryMaths, WarpPoints
     from nipype.interfaces.fsl.maths import MathsCommand
-    from functions import parse_xml
+    from updated.l1_analysis.functions import parse_xml
     import re, os
     import numpy as np
     from updated.l1_analysis.functions import data_driven, warp
@@ -20,6 +20,7 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, seg
     model.inputs.time_repetition = TR
     model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
     model.inputs.functional_runs = smoothed
+    model.inputs.outlier_files = outliers
     
     if event_file:
         model.inputs.bids_event_file = event_file
@@ -52,7 +53,7 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, seg
             createseed.inputs.args = '-mul 0 -add 1 -roi {x} 1 {y} 1 {z} 1 0 1'.format(x=x, y=y, z=z)
             seed = createseed.run().outputs.out_file
             
-            makesphere = Node(MathsCommand(in_file=seed, output_datatype='float'), name='makesphere')
+            makesphere = Node(MathsCommand(in_file=seed), name='makesphere')
             makesphere.inputs.args = '-kernel sphere {radius} -fmean'.format(radius=radius)
             
             thrseed = ImageMaths(op_string='-bin')

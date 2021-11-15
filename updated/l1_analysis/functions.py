@@ -46,6 +46,32 @@ def invert(warp, brain):
     invwarp = Node(InvWarp(warp=warp, ref=brain), name='invwarp')
     return invwarp.run().outputs.inverse_warp
 
+def parse_xml(xml, goal, mask):
+    import xml.etree.ElementTree as ET
+    import re, os, glob
+    search = ''
+    fsl = os.getenv('FSLDIR')
+    for word in goal.split(' '):
+        search +=  word + '.*'
+        
+    ind = 2 - int(re.search('_([0-9])mm', mask).group(1))
+    if xml.lower() in 'harvard-oxford':
+        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+            tree = ET.parse(atlas)
+            root = tree.getroot()
+        
+            for label in root.iter('label'):
+                name = label.text
+                if re.search(search, name, re.IGNORECASE):
+                    file = fsl + '/data/atlases' + root.findall('.//header/images/imagefile')[ind].text + '.nii.gz'
+                    index = label.attrib['index']
+                    out_name = name
+            
+        return file, index, out_name
+    
+    else:
+        print('ERROR')
+
 def function_str(name, dic=''):   
     from updated.l1_analysis.workflows import info
     valid_functions = ['info']

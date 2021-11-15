@@ -1,0 +1,2 @@
+ImageMath 3 sub-002S6009_T1w_maths.nii.gz TruncateImageIntensity /Volumes/NewVolume/super_agers/sub-002S6009/anat/sub-002S6009_T1w.nii.gz 0.01 0.999 256
+

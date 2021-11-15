@@ -5,13 +5,13 @@ Created on Thu Sep 30 13:29:04 2021
 
 @author: grahamseasons
 """
-from updated.normalization.spatial_normalization import spatial_normalization
+from normalization.spatial_normalization import spatial_normalization
 from nipype import Workflow, Node, IdentityInterface, Function
 from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, FAST, UnaryMaths
 from nipype.algorithms.rapidart import ArtifactDetect
 import os
 from updated.preprocessing.functions import get_wm, get_sink
-from niworkflows.anat.ants import init_brain_extraction_wf
+#from niworkflows.anat.ants import init_brain_extraction_wf
 from niworkflows.func.util import init_enhance_and_skullstrip_bold_wf
 
 class preprocess(spatial_normalization):
@@ -33,7 +33,8 @@ class preprocess(spatial_normalization):
         
         preprocess.connect([(inputnode, preprocess.get_node('Fregistration'), [('T1w', 'T1w'),
                                                                               ('mask', 'mask')]),
-                            (inputnode, preprocess.get_node('bet'), [('T1w', 'inputnode.in_files')]),
+                            #(inputnode, preprocess.get_node('bet'), [('T1w', 'inputnode.in_files')]),
+                            (inputnode, preprocess.get_node('bet'), [('T1w', 'T1w')]),
                             (inputnode, preprocess.get_node('slicetimer'), [('TR', 'time_repetition')]),
                             (inputnode, preprocess.get_node('extract'), [('bold', 'in_file')]),
                             (inputnode, preprocess.get_node('warp'), [('mask', 'ref_file')]),
@@ -50,7 +51,7 @@ class preprocess(spatial_normalization):
                             (preprocess.get_node('warp'), preprocess.get_node('Fmni'), [('field_file', 'warp')]),
                             ])
         
-        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'brain', 'brainmask', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'brain', 'brainmask', 'outliers', 'unsmoothed', 'invwarp', 'keepreg', 'keepsmooth']), name='outnode')
         
         preprocess.connect([(preprocess.get_node('bet_strip'), outnode, [('out_file', 'brain')]),
                             (preprocess.get_node('Fmni'), outnode, [('segmentations', 'segmentations')]),
@@ -60,7 +61,7 @@ class preprocess(spatial_normalization):
                             (preprocess.get_node('Fmni'), outnode, [('warp', 'warp_file')]),
                             (preprocess.get_node('invwarp'), outnode, [('invwarp', 'invwarp')]),
                             #(preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
-                            #(preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
+                            (preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
                             #(preprocess.get_node('Fregistration'), outnode, [('out_mat', 'coregmat')]),
                             (preprocess.get_node('Fregistration'), outnode, [('files', 'keepreg')]),
                             (preprocess.get_node('fillmask'), outnode, [('out_file', 'brainmask')]),
@@ -148,15 +149,19 @@ class preprocess(spatial_normalization):
                       (flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
                       (flow.get_node('Fmni'), Fregress, [('brainmask', 'mask')]),
                       (flow.get_node('Fmni'), Fregress, [('segmentations', 'segmentations')]),
-                      (art, Fregress, [('outlier_files', 'outliers')]),
+                      #(art, Fregress, [('outlier_files', 'outliers')]),
                       (mcflirt, Fregress, [('par_file', 'mc_par')]),
                       (Fregress, Fsmooth, [('warped', 'warped')]),
                       (fillmask, Fsmooth, [('out_file', 'mask')]),
                       ])
         
-    def coregistration(self, flow, func_dic):
+    def coregistration(self, flow, func_dic):#SEARCH TO SEE IF BET ALREADY RUN AND OUTPUT SAVED
         from updated.preprocessing.functions import function_str, strip_container
-        bet = init_brain_extraction_wf(name='bet')
+        from updated.preprocessing.workflows import check4brains
+        
+        bet = Node(Function(input_names=['out_dir', 'T1w'], output_names='out_file', function=check4brains), name='bet') #init_brain_extraction_wf(name='bet')
+        bet.out_dir = self.base_dir
+        
         bet_strip = Node(Function(input_names='in_file', output_names='out_file', function=strip_container), name='bet_strip')
         fast = Node(FAST(output_type='NIFTI_GZ', segments=True), name='fast')
         
@@ -176,7 +181,7 @@ class preprocess(spatial_normalization):
         
         boldmask = init_enhance_and_skullstrip_bold_wf(name='boldmask', pre_mask=True)
         
-        flow.connect([(bet, bet_strip, [('outputnode.out_file', 'in_file')]),
+        flow.connect([(bet, bet_strip, [('out_file', 'in_file')]),#('outputnode.out_file', 'in_file')]),
                       (bet_strip, fast, [('out_file', 'in_files')]),
                       (bet_strip, Fregistration, [('out_file', 'bet')]),
                       (bet_strip, Fmni, [('out_file', 'brain')]),

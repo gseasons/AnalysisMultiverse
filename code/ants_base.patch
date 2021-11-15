@@ -1,0 +1,8 @@
+44a45,47
+>         
+>         if v_string[0] == "v":
+>             v_string = v_string[1:]
+49c52
+<         ):
+---
+>         ) and LooseVersion(v_string) < LooseVersion("2.3.0"):

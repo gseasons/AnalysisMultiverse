@@ -1,0 +1,31 @@
+[
+    [
+        "copy_header",
+        true
+    ],
+    [
+        "dimension",
+        3
+    ],
+    [
+        "op1",
+        [
+            "/Users/grahamseasons/.cache/templateflow/tpl-OASIS30ANTs/tpl-OASIS30ANTs_res-01_T1w.nii.gz",
+            "67cc0898cf2534565ce019c66b21a2cc"
+        ]
+    ],
+    [
+        "op2",
+        "1.5 1"
+    ],
+    [
+        "operation",
+        "Laplacian"
+    ],
+    [
+        "needed_outputs",
+        [
+            "output_image"
+        ]
+    ]
+]

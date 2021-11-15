@@ -1,0 +1,32 @@
+Mar 08, 2020 2:45:58 PM com.mathworks.hwservices.logging
+INFO: Launching HW Setup: Arduino IO for base code ML_ARDUINO
+Mar 08, 2020 2:45:58 PM com.mathworks.hwservices.logging
+INFO: Initializing screen -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 08, 2020 2:45:59 PM com.mathworks.hwservices.logging
+INFO: Displaying -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 08, 2020 2:46:09 PM com.mathworks.hwservices.logging
+INFO: Initializing screen -- Arduino IO:arduinoio.setup.internal.SelectConnectionScreen
+Mar 08, 2020 2:46:10 PM com.mathworks.hwservices.logging
+INFO: Displaying -- Arduino IO:arduinoio.setup.internal.SelectConnectionScreen
+Mar 08, 2020 2:46:20 PM com.mathworks.hwservices.logging
+INFO: Initializing screen -- Arduino IO:arduinoio.setup.internal.UpdateServerScreen
+Mar 08, 2020 2:46:22 PM com.mathworks.hwservices.logging
+INFO: Displaying -- Arduino IO:arduinoio.setup.internal.UpdateServerScreen
+Mar 08, 2020 2:46:54 PM com.mathworks.hwservices.logging
+INFO: Exiting workflow -- Arduino IO
+Mar 09, 2020 2:19:35 PM com.mathworks.hwservices.logging
+INFO: Launching HW Setup: Arduino IO for base code ML_ARDUINO
+Mar 09, 2020 2:19:35 PM com.mathworks.hwservices.logging
+INFO: Initializing screen -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 09, 2020 2:19:36 PM com.mathworks.hwservices.logging
+INFO: Displaying -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 09, 2020 2:19:38 PM com.mathworks.hwservices.logging
+INFO: Exiting workflow -- Arduino IO
+Mar 09, 2020 2:19:44 PM com.mathworks.hwservices.logging
+INFO: Launching HW Setup: Arduino IO for base code ML_ARDUINO
+Mar 09, 2020 2:19:44 PM com.mathworks.hwservices.logging
+INFO: Initializing screen -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 09, 2020 2:19:44 PM com.mathworks.hwservices.logging
+INFO: Displaying -- Arduino IO:arduinoio.setup.internal.DriverInstallResultScreen
+Mar 09, 2020 2:19:46 PM com.mathworks.hwservices.logging
+INFO: Exiting workflow -- Arduino IO

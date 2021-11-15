@@ -10,15 +10,18 @@ import numpy as np
 import re, os, random
 from os.path import join as opj
 from updated.functions import define_paths
+#from functions import define_paths, generate_dictionaries
 from updated.analysis_pipeline import analysis
+#from analysis_pipeline import analysis
 from bids.layout import BIDSLayout
 from nipype.interfaces.base import Undefined
 from updated.functions import generate_dictionaries
+#from functions import generate_dictionaries
 #from nipype.interfaces.traits import _Undefined
 
-exp_dir = '/Volumes/NewVolume/sup_pre_full'
+exp_dir = '/Volumes/NewVolume/sup_pre_full2'#'/scratch'#'/Volumes/NewVolume/sup_pre_full'
 working_dir = 'working_dir'
-data_dir = '/Volumes/NewVolume/super_agers'
+data_dir = '/Volumes/NewVolume/super_agers'#'/data'#'/Volumes/NewVolume/super_agers'
 out_dir = exp_dir + '/processed'
 mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
 
@@ -257,10 +260,12 @@ def on_pop_gen(ga): #on_generation, on_start, check to make sure not rerunning p
     pop = ga.population
     params = pop.transpose()
     pipeline = generation * pop.shape[0]
+    
     layout = BIDSLayout(data_dir)
     tasks = layout.get_tasks()
     for task in tasks:
-        subjects = layout.get_subjects(task=task)[0:10]
+        subjects = layout.get_subjects(task=task)
+        subjects.sort()
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -318,7 +323,10 @@ def main():
                num_genes=num_genes,
                gene_space=gene_space,
                parent_selection_type='sss',
-               keep_parents=-1,
+               
+               keep_parents=0,
+               save_solutions=False,
+               
                crossover_type="single_point",
                mutation_type="random",
                mutation_probability=0.2,
