@@ -1,0 +1,144 @@
+{
+    "preprocess": [
+        {
+            "node_to_add": "decision_mc_mean",
+            "node_to_copy": "mcflirt_mean_vol"
+        },
+        {
+            "node_to_add": "Fregress_glm_des_norm",
+            "node_to_copy": "Fregress_glm_dat_norm"
+        },
+        {
+            "node_to_add": "Fregistration_regbbr_interp",
+            "node_to_copy": "Fregistration_regpre_interp",
+            "on_off": "Fregistration_bbr"
+        },
+        {
+            "node_to_add": "Fregistration_regbbr_no_resample",
+            "node_to_copy": "Fregistration_regpre_no_resample",
+            "on_off": "Fregistration_bbr"
+        },
+        {
+            "node_to_add": "Fregistration_applywarp_interp",
+            "node_to_copy": "Fregistration_regpre_interp"
+        },
+        {
+            "node_to_add": "Fregistration_applywarp_no_resample",
+            "node_to_copy": "Fregistration_regpre_no_resample"
+        },
+        {
+            "node_to_add": "invwarp_warplater",
+            "node_to_copy": "Fmni_warplater"
+        },
+        {
+            "node_to_add": "invwarp_concatenate",
+            "node_to_copy": "Fregistration_concatenate"
+        },
+        {
+            "node_to_add": "Fmni_concatenate",
+            "node_to_copy": "Fregistration_concatenate"
+        }
+    ],
+    "level1": [
+        {
+            "verify": "seedinfo",
+            "values": ["atlas", "data"]
+        },
+        {
+            "verify": "atlas",
+            "values": ["atlas", "data"]
+        },
+        {
+            "verify": "coords",
+            "values": ["ROI"]
+        },
+        {
+            "verify": "radius",
+            "values": ["ROI"]
+        },
+        {
+            "verify": "k",
+            "values": ["data"]
+        },
+        {
+            "verify": "kcc",
+            "values": ["data"]
+        },
+        {
+            "verify": "lp",
+            "values": ["data"]
+        },
+        {
+            "verify": "hp",
+            "values": ["data"]
+        },
+        {
+            "node_to_add": "Finfo_warppostfeat",
+            "node_to_copy": "Fmni_warplater"
+        },
+        {
+            "node_to_add": "Finfo_concatenate",
+            "node_to_copy": "Fregistration_concatenate"
+        },
+        {
+            "node_to_add": "correction_discard",
+            "node_to_copy": "extract_t_min"
+        },
+        {
+            "node_to_add": "applywarpcopes_interp",
+            "node_to_copy": "Fmni_warped_interp"
+        },
+        {
+            "node_to_add": "applywarpvarcopes_interp",
+            "node_to_copy": "Fmni_warped_interp"
+        },
+        {
+            "node_to_add": "applywarpbold_interp",
+            "node_to_copy": "Fmni_warped_interp"
+        },
+        {
+            "node_to_add": "ret_needwarp",
+            "node_to_copy": "Fmni_warplater"
+        },
+        {
+            "node_to_add": "ident_needwarp",
+            "node_to_copy": "Fmni_warplater"
+        },
+        {
+            "node_to_add": "correction_discard",
+            "node_to_copy": "extract_t_min"
+        }
+    ],
+    "level2": [
+        {
+            "node_to_edit": "flameo_infer_outliers",
+            "on_off": "flameo_run_mode",
+            "switch": "fe"
+        }
+    ],
+    "level3": [
+        {
+            "node_to_edit": "flameo_infer_outliers",
+            "on_off": "flameo_run_mode",
+            "switch": "fe"
+        }
+    ],
+    "correction": [
+        {
+            "verify": "pthreshold",
+            "values": ["clust"]
+        },
+        {
+            "verify": "zthreshold",
+            "values": ["clust"]
+        },
+        {
+            "verify": "connectivity",
+            "values": ["clust"]
+        },
+        {
+            "verify": "p",
+            "values": ["fdr", "fwe"]
+        }
+    ]
+}

@@ -15,20 +15,22 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     from nipype.interfaces.afni.utils import ReHo
     from nipype.interfaces.fsl.maths import TemporalFilter, Threshold
     from nipype.interfaces.fsl import IsotropicSmooth
+    import os
+    base_dir = os.getcwd()
     
-    bpfilter = Node(TemporalFilter(in_file=unsmoothed), name='bpfilter')
+    bpfilter = Node(TemporalFilter(in_file=unsmoothed), name='bpfilter', base_dir=base_dir)
     #HZ to sigma conversion taken from: https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;fc5b33c5.1205
     bpfilter.inputs.lowpass_sigma = 1 / (2 * TR * lp)
     bpfilter.inputs.highpass_sigma = 1 / (2 * TR * hp)
     
     filtered = bpfilter.run().outputs.out_file
     filtered = IsotropicSmooth(fwhm=6, in_file=filtered).run().outputs.out_file
-    reho = Node(ReHo(in_file=filtered), name='reho')
+    reho = Node(ReHo(in_file=filtered), name='reho', base_dir=base_dir)
     reho.inputs.neighborhood = k
     reho.inputs.mask_file = mask
     rehomap = reho.run().outputs.out_file
     
-    thresh = Node(Threshold(in_file=rehomap, args='-bin'), name='thresh')
+    thresh = Node(Threshold(in_file=rehomap, args='-bin'), name='thresh', base_dir=base_dir)
     thresh.inputs.thresh = kcc
     
     return thresh.run().outputs.out_file
@@ -36,16 +38,20 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
 def warp(in_file, ref, warp):
     from nipype import Node
     from nipype.interfaces.fsl import ApplyWarp
-    warped = Node(ApplyWarp(ref_file=ref, field_file=warp), name='warped')
+    import os
+    base_dir = os.getcwd()
+    warped = Node(ApplyWarp(ref_file=ref, field_file=warp), name='warped', base_dir=base_dir)
     warped.inputs.in_file = in_file
     return warped.run().outputs.out_file
 
 def invert(warp, brain):
     from nipype import Node
     from nipype import InvWarp
-    invwarp = Node(InvWarp(warp=warp, ref=brain), name='invwarp')
+    import os
+    base_dir = os.getcwd()
+    invwarp = Node(InvWarp(warp=warp, ref=brain), name='invwarp', base_dir=base_dir)
     return invwarp.run().outputs.inverse_warp
-    
+
 def parse_xml(xml, goal, mask):
     import xml.etree.ElementTree as ET
     import re, os, glob
@@ -68,7 +74,7 @@ def parse_xml(xml, goal, mask):
                     out_name = name
             
         return file, index, out_name
-
+    
     else:
         print('ERROR')
 

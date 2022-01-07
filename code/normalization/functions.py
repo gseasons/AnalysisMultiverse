@@ -8,8 +8,10 @@ Created on Thu Oct 14 10:31:37 2021
 def invert(warp, brain, brainmask, warplater, coregmat, concatenate):
     from nipype import Node
     from nipype.interfaces.fsl import InvWarp, ConvertXFM, ConvertWarp
+    import os
+    base_dir = os.getcwd()
     if warplater:
-        invwarp = Node(InvWarp(warp=warp, reference=brain), name='invwarp')
+        invwarp = Node(InvWarp(warp=warp, reference=brain), name='invwarp', base_dir=base_dir)
         invwarp = invwarp.run().outputs.inverse_warp
         if concatenate:
             invcoreg = ConvertXFM(in_file=coregmat, invert_xfm=True).run().outputs.out_file
@@ -21,9 +23,11 @@ def invert(warp, brain, brainmask, warplater, coregmat, concatenate):
 def identity(cope, varcope, bold, needwarp):
     from nipype.interfaces.fsl import ImageMaths
     from nipype import Node
-            
+    import os
+    base_dir = os.getcwd()
+    
     if not needwarp:
-        clear = Node(ImageMaths(op_string='-mul 0 -bin'), name='clear')
+        clear = Node(ImageMaths(op_string='-mul 0 -bin'), name='clear', base_dir=base_dir)
         clear.inputs.in_file = cope
         cope = clear.run().outputs.out_file
         varcope = cope
