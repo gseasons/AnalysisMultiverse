@@ -86,8 +86,9 @@ conf.set("execution", "hash_method", "content")
 if not config['debug']:
     conf.set("execution", "remove_node_directories", "true")
     
-if len(sys.argv) > 1:
-    profile = sys.argv[1]
+config['rerun'] = sys.argv[1]
+if len(sys.argv) > 2:
+    profile = sys.argv[2]
     
 wiggle = 10
 map_genes = {}

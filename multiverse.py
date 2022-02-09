@@ -87,7 +87,7 @@ def main():
                 print('Running Container')
                 container = client.containers.run('gseasons/multiverse', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes, user='root')
                 container.start()
-                container.exec_run('sudo /bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py"')
+                container.exec_run('sudo /bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
                 container.remove()
                 client.volumes.prune()
@@ -99,7 +99,7 @@ def main():
                     
                 container = client.containers.run('gseasons/multiverse', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes)
                 container.start()
-                container.exec_run('/bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py"')
+                container.exec_run('/bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
                 container.remove()
                 client.volumes.prune()
@@ -110,7 +110,7 @@ def main():
             #config['account'] = 'def-emazerol'
             #config['time'] = '0-05:00'
             #config['mem'] = '40000'
-            subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out])
+            subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, args.rerun])
             
 
 if __name__ == "__main__":

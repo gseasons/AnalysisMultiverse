@@ -32,7 +32,7 @@ echo "Launching Job"
 
 singularity exec -H $2:/scratch -e -B ~/code/plugins_base.py:$custom_base -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
 $container /bin/bash -c \
-"source activate multiverse ; python /code/multiverse/run_multiverse.py ${profile}"
+"source activate multiverse ; python /code/multiverse/run_multiverse.py ${3} ${profile}"
 
 #\
 #|| singularity exec -H $2:/scratch -e -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
