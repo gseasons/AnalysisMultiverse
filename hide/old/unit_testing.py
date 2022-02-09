@@ -9,6 +9,178 @@ from niworkflows.anat.ants import init_brain_extraction_wf
 from bids.layout import BIDSLayout
 from nipype import IdentityInterface, Node, DataSink
 from nipype import config, Workflow, Node, IdentityInterface
+
+from nipype.utils.draw_gantt_chart import generate_gantt_chart
+
+def regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm):
+    from nipype import Node
+    from nipype.interfaces.base import Undefined
+    from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
+    from nipype.interfaces.fsl.maths import MeanImage
+    from nipype.interfaces.base import CommandLine
+    import numpy as np
+    import nibabel as nib
+    import os, re
+    base_dir = os.getcwd()
+
+    if rest:
+        CSF = vars().get('CSF', True)
+        WM = vars().get('WM', True)
+        GLOBAL = vars().get('GLOBAL', True)
+    else:
+        CSF = vars().get('CSF', False)
+        WM = vars().get('WM', False)
+        GLOBAL = vars().get('GLOBAL', False)
+
+    params = np.loadtxt(mc_par)
+    reho = np.loadtxt(mc_par)
+
+    if not vars().get('realignregress', True):
+        params = np.zeros((params.shape[0], 1))
+
+    resample = False
+    suffix = ''
+
+    reference = Node(MeanImage(in_file=unsmoothed, dimension='T'), name='reference', base_dir=base_dir).run().outputs.out_file
+    if nib.load(unsmoothed).shape[0:-1] != nib.load(mask).shape:
+        resample = True
+
+    csfmask = segmentations[0]
+    csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+    if resample:
+        csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask', base_dir=base_dir).run().outputs.out_file
+    meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf', base_dir=base_dir)
+    csf = np.loadtxt(meancsf.run().outputs.out_file).reshape(-1, 1)
+    reho = np.hstack((reho, csf))
+
+    if CSF:
+        params = np.hstack((params, csf))
+        suffix += 'CSF_'
+
+    wmmask = segmentations[2]
+    wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+    if resample:
+        wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask', base_dir=base_dir).run().outputs.out_file
+    meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf', base_dir=base_dir)
+    wm = np.loadtxt(meanwm.run().outputs.out_file).reshape(-1, 1)
+    reho = np.hstack((reho, wm))
+
+    if WM:
+        params = np.hstack((params, wm))
+        suffix += 'WM_'
+
+    if GLOBAL:
+        meanglob = Node(ImageMeants(in_file=unsmoothed, mask=mask), name='meanglob', base_dir=base_dir)
+        glob = np.loadtxt(meanglob.run().outputs.out_file).reshape(-1, 1)
+        params = np.hstack((params, glob))
+        reho = np.hstack((reho, glob))
+        suffix += 'GLOBAL'
+
+    name_ = os.getcwd() + '/' + suffix
+
+    if not vars().get('realignregress', True):
+        params = params[:,1:]
+
+    np.savetxt(name_ + '.txt', params)
+    cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_)
+    cl = CommandLine(cmd)
+    cl.run().runtime
+
+    name_reho = os.getcwd() + '/' + suffix + '_reho'
+    np.savetxt(name_ + '.txt', reho)
+    cmd = ('Text2Vest {name_}.txt {name_reho}.mat').format(name_=name_, name_reho=name_reho)
+    cl = CommandLine(cmd)
+    cl.run().runtime
+
+    forreho = unsmoothed
+    if np.any(params):
+        out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
+        glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
+
+        for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
+                search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
+                if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
+                else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
+
+        regressed = glm.run().outputs.out_res
+        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+        unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+
+    if np.any(reho) and not np.array_equal(reho, params):
+        out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
+        glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
+
+        for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
+                search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
+                if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
+                else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
+
+        regressed = glm.run().outputs.out_res
+        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+        forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+
+    return unsmoothed, forreho
+
+unsmoothed = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_task-rest_bold_roi_mcf_st_warp.nii.gz'
+segmentations = ['/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_0_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_1_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_2_warp.nii.gz']
+CSF = True
+GLOBAL = False
+WM = True
+glm_dat_norm = True
+glm_demean = True
+glm_des_norm = True
+realignregress = False
+rest = True
+mc_par = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_subject_002S6053/_i_0/_i_3/mcflirt/sub-002S6053_task-rest_bold_roi_mcf.nii.gz.par'
+mask = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_thresh_flirt_warp.nii.gz'
+regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm)
+
+generate_gantt_chart('/Volumes/NewVolume/a/run_stats.log', 4)
+
+# =============================================================================
+# import os
+# from nipype import config as conf
+# from nipype.utils.profiler import log_nodes_cb
+# conf.enable_resource_monitor()
+# import logging
+# callback_log_path = 'mapnode_test.log'
+# logging.basicConfig(filename=callback_log_path, level=logging.DEBUG)
+# logger = logging.getLogger('callback')
+# handler = logging.FileHandler(callback_log_path)
+# logger.addHandler(handler)
+# 
+# from nipype import MapNode, Workflow, DataSink, Node
+# from nipype.interfaces.fsl import ExtractROI
+# 
+# extract = Node(ExtractROI(in_file='/Volumes/NewVolume/super_agers/sub-002S6009/func/sub-002S6009_task-rest_bold.nii.gz', t_min=1, t_size=2), iterfield='t_size', name='extract')
+# dat = Node(DataSink(), 'dat')
+# 
+# egg = Workflow('egg')
+# egg.base_dir = os.getcwd()
+# 
+# egg.connect(extract, 'roi_file', dat, 'blech')
+# egg.run(plugin='Linear', plugin_args={'status_callback': log_nodes_cb})
+# =============================================================================
+
+from pathlib import Path
+import re
+processed = {'network': {}}
+pathlist = Path('/Volumes/NewVolume/docker_test/processed').glob('**/*_corrected_[0-9]*')
+for path in pathlist:
+    path = str(path)
+    network = int(re.search('.*_network_([0-9]+)', path).group(1))
+    contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
+    pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
+    if network in processed['network']:
+        if contrast in processed['network'][network]['contrast']:
+            processed['network'][network]['contrast'][contrast]['pipeline'][pipeline] = path
+        else:
+            processed['network'][network]['contrast'][contrast] = {'pipeline': {pipeline: path}}
+    else:
+        processed['network'] = {network: {'contrast': {contrast: {'pipeline': {pipeline: path}}}}}
+
+A=3
+
 #config.set("execution", "remove_node_directories", "true")
 # =============================================================================
 # global _10, _67, _3

@@ -33,6 +33,29 @@ from nipype import config, Workflow, Node, IdentityInterface
 # while egg:
 #     egg, lst, searched = _graph_expansion(lst, searched)
 # =============================================================================
+import math
+import numpy as np
+pop_ = np.zeros([202,8])
+params_ = pop_.transpose()
+gb_per_pipe = 20
+        
+if (50000 / gb_per_pipe) < pop_.shape[0]:
+    batch_size = int(500 / gb_per_pipe)
+    iterations = math.ceil(pop_.shape[0] / batch_size)
+else:
+    batch_size = pop_.shape[0]
+    iterations = 1
+
+for batch in range(iterations):
+    #PARAMS AND POP NEED TO BE INDEXED
+    if (batch+1) * batch_size < pop_.shape[0]:
+        params = params_[:, batch*batch_size:(batch+1)*batch_size]
+        pop = pop_[batch*batch_size:(batch+1)*batch_size,:]
+    else:
+        params = params_[:, batch*batch_size:]
+        pop = pop_[batch*batch_size:,:]
+
+
 
 def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, outliers, segmentations, invwarp, network, rest, HP, warppostfeat, concatenate):
     from nipype import Node
