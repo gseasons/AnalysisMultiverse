@@ -19,6 +19,8 @@ def invalid(mapped):
     raise SyntaxError("Input paramater '{name}' in an unsupported format. Acceptable formats are (brain region, thr), (brain region, thr_min, thr_max, or path_to_mask".format(name=mapped))
 
 def generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle, ind_start, frame):
+    """Generates dictionaries of analysis parameters for workflow from GA output.
+       i.e. Converts numeric values into values accepted by nodes, as defined in links"""
     container = np.zeros((1, pop.shape[0]), str)
     indexes = [(ind_start, ind_start+pop.shape[0])]
 # =============================================================================

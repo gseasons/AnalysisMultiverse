@@ -10,7 +10,7 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
     from nipype import Node
     from versatile import SpecifyModelVersatile
     from nipype.interfaces.fsl import ImageMeants, ExtractROI, ImageMaths, BinaryMaths, WarpPoints
-    from nipype.interfaces.fsl.maths import MathsCommand
+    from nipype.interfaces.fsl.maths import MathsCommand, TemporalFilter
     import re, os
     import numpy as np
     from l1_analysis.functions import data_driven, warp, parse_xml
@@ -18,8 +18,14 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
     model = Node(SpecifyModelVersatile(input_units='secs', parameter_source='FSL'), name='model')
     model.inputs.time_repetition = TR
     model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
-    model.inputs.functional_runs = smoothed
     model.inputs.outlier_files = outliers
+    
+    if vars().get('LP', False):
+        lpfilter = TemporalFilter(in_file=smoothed)
+        lpfilter.inputs.lowpass_sigma = 1 / (2 * TR * vars().get('LP'))
+        smoothed = lpfilter.run().outputs.out_file
+        
+    model.inputs.functional_runs = smoothed
     
     if event_file:
         model.inputs.bids_event_file = event_file

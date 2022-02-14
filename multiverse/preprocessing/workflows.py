@@ -101,8 +101,8 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
     
     bbr = vars().get('bbr', True)
     concatenate = vars().get('concatenate', True)
-    
-    regpre = Node(FLIRT(in_file=start_img, reference=bet, output_type='NIFTI_GZ'), name='regpre')
+    #CHECK TO VERIFY THAT DOF IS CALLED DOG
+    regpre = Node(FLIRT(in_file=start_img, dof=6, reference=bet, output_type='NIFTI_GZ'), name='regpre')
     
     applywarp = Node(FLIRT(in_file=corrected_img, reference=bet, output_type='NIFTI_GZ'), name='applywarp')
     

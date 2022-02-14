@@ -2,7 +2,7 @@
 
 module load singularity
 
-container=~/multiverse.sif
+container=~/multiverse_latest.sif
 custom_base=/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py
 
 if [ ! -f $container ]; then
@@ -25,23 +25,6 @@ srun singularity run -B $2:/scratch -e -B ~/code/plugins_base.py:$custom_base -B
 sleep 45
 echo "Launching Job"
 
-#singularity exec -H $2:/scratch -e -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
-#library://gseasons/default/multiverse.sif:latest /bin/bash -c \
-#"source activate multiverse ; python /code/multiverse/run_multiverse.py ${profile}"\
-#|| 
-
 singularity exec -H $2:/scratch -e -B ~/code/plugins_base.py:$custom_base -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
 $container /bin/bash -c \
 "source activate multiverse ; python /code/multiverse/run_multiverse.py ${3} ${profile}"
-
-#\
-#|| singularity exec -H $2:/scratch -e -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
-#multiverse_latest.sif /bin/bash -c \
-#"source activate multiverse ; python /code/multiverse/run_multiverse.py ${profile}"\
-#|| (singularity pull library://gseasons/default/multiverse.sif:latest &&\
-#singularity exec -H $2:/scratch -e -B ~/.ipython:/scratch/.ipython -B ~/code:/code/multiverse -B $1:/data \
-#multiverse_latest.sif /bin/bash -c \
-#"source activate multiverse ; python /code/multiverse/run_multiverse.py ${profile}")\
-#|| echo "Error: Cannot run or pull singularity container. \
-#Please upload the container image (https://cloud.sylabs.io/library/gseasons/multiverse/multiverse.sif)\
-# to your working (output) directory or your home directory."
