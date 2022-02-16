@@ -327,14 +327,14 @@
                 },
                 {
                     "on_off": "on",
-                    "alias": "Bandpass lower threshold",
+                    "alias": "Bandpass upper threshold",
                     "name": "rest_lp",
                     "value": [0.1],
                     "default": 0
                 },
                 {
                     "on_off": "on",
-                    "alias": "Bandpass upper threshold",
+                    "alias": "Bandpass lower threshold",
                     "name": "rest_hp",
                     "value": [0.01],
                     "default": 0

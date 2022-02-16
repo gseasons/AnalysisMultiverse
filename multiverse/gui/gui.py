@@ -277,9 +277,9 @@ class MultiverseConfig():
         self.cpus.insert(4, self.pipelines.get())
         self.cpus.grid(row=2, column=1)
         
-        ttk.Label(self.slurm_frame, text='Memory required (MB, ~4GB/CPU):').grid(row=3)
+        ttk.Label(self.slurm_frame, text='Memory required per CPU (MB):').grid(row=3)
         self.mem = ttk.Entry(self.slurm_frame)
-        self.mem.insert(4, str(int(self.pipelines.get())*4000))
+        self.mem.insert(4, str(6000))
         self.mem.grid(row=3, column=1)
         #NEED BETTER BENCHMARK
         ttk.Label(self.slurm_frame, text='Time ~2H * (subject,scan,pipeline) / CPUs').grid(row=4)
@@ -730,8 +730,13 @@ class MultiverseConfig():
         
         ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=alias).grid(row=1)
         
+        if butt_text == "Off":
+            text = str(value_map[default])
+        else:
+            text = str(value_map)
+            
         ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text='Value Pool:').grid(row=2)
-        vars(self)['valuepool_'+stage+param_name_full] = ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=str(value_map))
+        vars(self)['valuepool_'+stage+param_name_full] = ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=text)
         vars(self)['valuepool_'+stage+param_name_full].grid(row=2, column=1)
 
         vars(self)[param_name_full+stage+'configbutton'] = tk.Button(vars(self)['aesthetic_frame_'+stage+param_name_full], text='Configure', 
@@ -790,7 +795,13 @@ class MultiverseConfig():
         ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=alias).grid(row=1)
         
         ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text='Value Pool:').grid(row=2)
-        vars(self)['valuepool_'+stage+param_name_full] = ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=str(value))
+        
+        if butt_text == "Off":
+            text = str(value[default])
+        else:
+            text = str(value)
+            
+        vars(self)['valuepool_'+stage+param_name_full] = ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text=text)
         vars(self)['valuepool_'+stage+param_name_full].grid(row=2, column=1)
 
         ttk.Label(vars(self)['aesthetic_frame_'+stage+param_name_full], text='Input Type:').grid(row=3)
