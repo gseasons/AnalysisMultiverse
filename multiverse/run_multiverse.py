@@ -16,9 +16,12 @@ import pickle
 from nipype import config as conf
 import json
 import sys
+import glob
 from pathlib import Path
 
 from nipype.utils.profiler import log_nodes_cb
+
+#TO DO: COMMENTS, CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
 
 exp_dir = '/scratch'
 working_dir = 'working_dir'
@@ -86,7 +89,11 @@ conf.set("execution", "hash_method", "content")
 if not config['debug']:
     conf.set("execution", "remove_node_directories", "true")
     
-config['rerun'] = sys.argv[1]
+if sys.argv[1] == "True":
+    config['rerun'] = True
+else:
+    config['rerun'] = False
+    
 if len(sys.argv) > 2:
     profile = sys.argv[2]
     
@@ -157,7 +164,9 @@ def on_pop_gen(ga):
     if check_pipes():
         return "stop"
     
-    if config['rerun']:
+    checkpoints = glob.glob('processed/reproducibility/checkpoints/checkpoint_*.pkl')
+    
+    if config['rerun'] or checkpoints:
         is_params = load('reproducibility', 'generation_'+str(generation)+'.pkl')
         if type(is_params) != str:
             params_ = is_params
@@ -170,7 +179,6 @@ def on_pop_gen(ga):
     for task in tasks:
         subjects = layout.get_subjects(task=task)
         subjects.sort()
-        subjects = subjects
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -180,7 +188,7 @@ def on_pop_gen(ga):
         else:
             multiscan = False
             
-        if config['rerun']:
+        if config['rerun'] or checkpoints:
             frame = ''
         else:
             frame = load('', task+'.pkl')
@@ -241,14 +249,21 @@ def on_pop_gen(ga):
                 pipelines.inputs.inputnode.task = task
                 
                 plugin_args = {}
-                
+                config['processing'] = 'MultiProc'
                 if config['processing'] == 'SLURM':
                     config['processing'] = 'IPython'
                     plugin_args = {'profile': profile}
+                    #CHANGE SO SAVES TO REPRODUCIBILITY
+                if checkpoints:
+                    pipelines = load('reproducibility', task + '_workflow.pkl')
+                else:
+                    save('reproducibility', task + '_workflow.pkl', pipelines)
                     
                 pipelines.run(plugin=config['processing'], plugin_args=plugin_args)#plugin='Linear', plugin_args={'status_callback': log_nodes_cb})#plugin=config, plugin_args=plugin_args)
             
     if 'num_generations' not in config:
+        if checkpoints:
+            os.rename('processed/reproducibility/checkpoints', 'processed/reproducibility/checkpoints_finished')
         sys.exit()#return "stop"
         #RUN PIPELINES IN BATCHES BASED ON NUMBER OF SUBJECTS/NUMBER OF PIPELINES -> max of ~0.83 GB PER SUBJECT PER PIPELINE
         #GA NOT SELECTED -> 1 generation, number of pipelines -> run in batches

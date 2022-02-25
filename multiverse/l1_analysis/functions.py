@@ -11,6 +11,7 @@ from workflows import write_out
 import re
 
 def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
+    """Implements ReHo calculation"""
     from nipype import Node
     from nipype.interfaces.afni.utils import ReHo
     from nipype.interfaces.fsl.maths import TemporalFilter, Threshold
@@ -36,6 +37,7 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     return thresh.run().outputs.out_file
 
 def warp(in_file, ref, warp):
+    """Applywarp to standard space, or the inverse"""
     from nipype import Node
     from nipype.interfaces.fsl import ApplyWarp
     import os
@@ -45,6 +47,7 @@ def warp(in_file, ref, warp):
     return warped.run().outputs.out_file
 
 def invert(warp, brain):
+    """Invert warp"""
     from nipype import Node
     from nipype import InvWarp
     import os
@@ -53,6 +56,7 @@ def invert(warp, brain):
     return invwarp.run().outputs.inverse_warp
 
 def parse_xml(xml, goal, mask):
+    """Get mask for brain region from atlas"""
     import xml.etree.ElementTree as ET
     import re, os, glob
     search = ''
@@ -78,7 +82,8 @@ def parse_xml(xml, goal, mask):
     else:
         print('ERROR')
 
-def function_str(name, dic=''):   
+def function_str(name, dic=''):
+    """Injects code which allows parameters to be dynamically assigned to workflows"""
     from l1_analysis.workflows import info
     valid_functions = ['info']
     if name in valid_functions:
@@ -109,6 +114,7 @@ def function_str(name, dic=''):
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
 
 def correct_task_timing(session_info, TR, discard):
+    """Subtract dummy scan timing from event information"""
     for i, info in enumerate(session_info):
         for j, task in enumerate(info['cond']):
             try:
@@ -120,6 +126,7 @@ def correct_task_timing(session_info, TR, discard):
     return session_info
 
 def get_sink(inputs, files):
+    """Expands datasink to include inputs and save specific files from folder"""
     if type(files) != list:
         files = [files]
         
@@ -135,8 +142,8 @@ def get_sink(inputs, files):
         "for file in {files}:\n",
         "    file_out = vars()[out] + '/' + file\n",
         "    if os.path.isdir(file_out) or os.path.isfile(file_out):\n",
-        "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, file_out)\n"
-        "    else:\n"
+        "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, file_out)\n",
+        "    else:\n",
         "        setattr(sink.inputs, 'pipelines/' + task + '.@' + str(i) + file, glob.glob(file_out))\n"])
         
     func_str = insert(func_str, search.start(3), "\n    "+search.group(2))
@@ -146,6 +153,7 @@ def get_sink(inputs, files):
     return func_str.format(files=str(files))
 
 def contrasts(session_info):
+    """Create contrasts for level 1 analysis"""
     contrasts = []
     identities = []
     for info in session_info:

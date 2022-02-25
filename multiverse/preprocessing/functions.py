@@ -11,15 +11,19 @@ from workflows import write_out
 import re
 
 def get_bright_thresh(medianval):
+    """Calculate brightness threshold for SUSAN workflow"""
     return 0.75 * medianval
 
 def getthreshop(thresh):
+    """Generate mask for SUSAN workflow"""
     return '-thr %.10f -Tmin -bin' % (0.1 * thresh[1])
 
 def get_wm(files):
+    """Return white matter file from FAST"""
     return files[-1]
 
 def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
+    """Ability to turn on/off slice timing correction as well as select median volume if not corrected to mean"""
     from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT
     import nibabel as nib
     import os, re
@@ -57,12 +61,14 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
         return mc_m, mc, mask
     
 def strip_container(in_file):
+    """Remove container"""
     if type(in_file) == list:
         return in_file[0]
     else:
         return in_file
 
-def function_str(name, dic=''):   
+def function_str(name, dic=''):
+    """Injects code which allows parameters to be dynamically assigned to workflows"""
     from preprocessing.workflows import registration, smooth, regress, mni
     valid_functions = ['registration', 'smooth', 'regress', 'mni']
     if name in valid_functions:
@@ -94,6 +100,7 @@ def function_str(name, dic=''):
             return func_str, re.search('def ' + name + '\(([A-Za-z_,0-9\s]+)\)', func_str).group(1).split(', ')
         
 def get_sink(inputs):
+    """Expands datasink to include inputs"""
     func_str = getsource(write_out)
     ind = func_str.find('):')
     params = ', ' + ', '.join(inputs)

@@ -16,6 +16,7 @@ from traceback import format_exception
 
 import numpy as np
 from collections.abc import Iterable
+import pickle, re
 
 from ... import logging
 from ...utils.misc import str2bool
@@ -106,17 +107,72 @@ class DistributedPluginBase(PluginBase):
         self.proc_pending = None
         self.pending_tasks = []
         self.max_jobs = self.plugin_args.get("max_jobs", np.inf)
+        #self._load_state()
 
     def _prerun_check(self, graph):
         """Stub method to validate/massage graph and nodes before running"""
 
     def _postrun_check(self):
         """Stub method to close any open resources"""
+    
+    def _load_state(self):
+        files_missing = True
+        checkpoints = sorted(glob('processed/reproducibility/checkpoints/checkpoint_*.pkl'), key=lambda val: int(re.search('.*_([0-9]+)', val).group(1)))
+        if checkpoints:
+            count = 1
+            _recent = checkpoints[-count]
+            while files_missing:
+                try:
+                    with open(_recent, 'rb') as f:
+                        saved_state = pickle.load(f)
+                    files_missing = False
+                except Exception as e:
+                    try:
+                        folder = re.search("a value of '(.*/).*.nii.*' <class", str(e)).group(1)
+                        file = re.search("a value of '(.*)' <class", str(e)).group(1)
+                        os.makedirs(folder)
+                        open(file, 'a').close()
+                    except:
+                        count += 1
+                        _recent = checkpoints[-count]
+            #CODE THAT CAN BE ADAPTED TO ALLOW FOR TARGETED FILE DELETION -> HOPEFULLY NOT NEEDED
+# =============================================================================
+#             indices = np.nonzero((saved_state['refidx'].sum(axis=1)).__array__())[0] #== 0
+#             for idx in indices:
+#                 if saved_state['proc_done'][idx] and saved_state['proc_pending'][idx]:
+#                     outdir = saved_state['procs'][idx].output_dir()
+#                     if os.path.exists(outdir + '/result_' + re.search('.*/(.*)$', outdir).group(1) + '.pklz'):
+#                         continue
+#                     if not os.path.exists(outdir):
+#                         continue
+# =============================================================================
+                    
+            saved_state['_config']['local_hash_check'] = False
+            self.__dict__.update(saved_state)
+    
+    def _save_state(self, stamp):
+        temp = self.__dict__.copy()
+        temp['proc_done'] = np.array(self.__dict__['proc_done'])
+        temp['proc_pending'] = np.array(self.__dict__['proc_pending'])
+        temp.pop('pool')
+        temp.pop('timestamp')
+        temp.pop('processors')
+        temp.pop('memory_gb')
+        _task_obj = temp['_task_obj']
+        temp['_task_obj'] = _task_obj.fromkeys(_task_obj, {})
+        file_name = 'processed/reproducibility/checkpoints/checkpoint_' + str(int(stamp)) + '.pkl'
+        
+        if not os.path.exists('processed/reproducibility/checkpoints'):
+            os.makedirs('processed/reproducibility/checkpoints')
+        
+        with open(file_name, 'wb') as f:
+            pickle.dump(temp, f)
 
     def run(self, graph, config, updatehash=False):
         """
         Executes a pre-defined pipeline using distributed approaches
         """
+        self.timestamp = time()
         logger.info("Running in parallel.")
         self._config = config
         poll_sleep_secs = float(config["execution"]["poll_sleep_duration"])
@@ -128,7 +184,11 @@ class DistributedPluginBase(PluginBase):
         self.mapnodesubids = {}
         # setup polling - TODO: change to threaded model
         notrun = []
-
+        
+        self.hours_elapsed = 0
+        if str2bool(self._config["execution"]["remove_node_directories"]):
+            self._load_state()
+        
         old_progress_stats = None
         old_presub_stats = None
         while not np.all(self.proc_done) or np.any(self.proc_pending):
@@ -415,6 +475,12 @@ class DistributedPluginBase(PluginBase):
         rowview[rowview.nonzero()] = 0
         if jobid not in self.mapnodesubids:
             self.refidx[self.refidx[:, jobid].nonzero()[0], jobid] = 0
+        
+        if str2bool(self._config["execution"]["remove_node_directories"]):
+            if (time() - self.timestamp) / 3600 > 1:
+                self.hours_elapsed += 1
+                self._save_state(self.hours_elapsed)
+                self.timestamp = time()
 
     def _generate_dependency_list(self, graph):
         """Generates a dependency list for a list of graphs."""
@@ -440,10 +506,12 @@ class DistributedPluginBase(PluginBase):
             idx = self.procs.index(node)
             self.proc_done[idx] = True
             self.proc_pending[idx] = False
+
         return dict(node=self.procs[jobid], dependents=subnodes, crashfile=crashfile)
     
     def _short_circuit_results(self, jobid):
         node_dir = self.procs[jobid].output_dir()
+        print(node_dir)
         results_file = glob(os.path.join(node_dir, "result_*.pklz"))[0]
         result_data = load_resultfile(results_file)
         result_out = dict(result=None, traceback=None)

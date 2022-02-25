@@ -11,6 +11,7 @@ Software for automated multiverse analysis for fMRI
   3. To rerun an analysis using the same pipelines as a prior run: 'python /PATH/TO/MULTIVERSE.PY/multiverse.py -r -rr -d /PATH/TO/BIDS_DATA -o /PATH/TO/OUTPUT_FOLDER'
     a. This requires the output directory to contain the reproducibility directory (including generation files) of the analysis to reproduce
     b. Similarly, the files multiverse/configuration/general_configuration.pkl and multiverse/configuration/multiverse_configuration.pkl should be the same as the analysis to be reproduced
+  4. Note: It may take a long time from the workflow calling .run() to actual execution (connecting nodes/inputs/outputs) - important in multiverse, as the more nodes, subjects, and pipelines the longer this will take (important to ask if some way to request fewer resources while this happening, then step up to needed amount once starts running)
   
 # Node Naming Conventions/Multiverse Modification
 - To add more parameters to multiverse analysis, edit the default.json file in configuration
@@ -25,6 +26,7 @@ Software for automated multiverse analysis for fMRI
     a. Function parameters must follow this naming convention:
       i. For variables only affecting the function and not internal nodes -> all lower case, one word (no underscore)
       ii. For nodes inside the function -> nodename_nipypeinterfaceparametername (similar to the above section, nipypeinterfaceparametername is copied exactly from nipype including underscores)
+    b. To enable dynamic parameter assignment, there must be a linebreak before the workflow is run inside a function (i.e. randomline \n\n workflow.run())
   2. Entries in json file starting with ~construct~ (i.e. ~construct~Finfo) indicate a dictionary will be constructed from the provided information, and passed to the function (i.e. Finfo) in the format of dictionaryname_parametername
   3. Entries starting with ! (i.e. !correction) indicate that the value will be copied from another parameter as defined in default_links.json
     a. node_to_add and node_to_copy indicate the name of the parameter to add, and the node the values will be copied from, respectively

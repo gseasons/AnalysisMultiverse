@@ -6,6 +6,7 @@ Created on Mon Oct  4 12:50:07 2021
 @author: grahamseasons
 """
 def check4brains(data_dir, T1w):
+    """Checks to see if there are saved brain extractions, runs ANTS BET workflow if not"""
     from nipype import SelectFiles
     from niworkflows.anat.ants import init_brain_extraction_wf
     from nipype import DataSink, Node
@@ -29,7 +30,7 @@ def check4brains(data_dir, T1w):
     
     data = Node(DataSink(parameterization=False), name='data', base_dir=base_dir)
     
-    wf = init_brain_extraction_wf()
+    wf = init_brain_extraction_wf(omp_nthreads=2, mem_gb=3)
     wf.base_dir = os.getcwd()
     wf.inputs.inputnode.in_files = T1w
     wf.connect(wf.get_node('outputnode'), 'out_file', data, data_dir + '/brain_extracted/_subject_{sID}/'.format(sID=sID))
@@ -38,6 +39,7 @@ def check4brains(data_dir, T1w):
     return glob.glob(data_dir + '/brain_extracted/_subject_{sID}/*masked.nii*'.format(sID=sID))[0]
 
 def smooth(warped, mask):
+    """Implements both FSL SUSAN smoothing, and Isometric smoothing"""
     #WORKFLOW ADAPTED FROM: https://nipype.readthedocs.io/en/latest/users/examples/fmri_fsl.html
     from nipype import Workflow, Node, IdentityInterface
     from nipype.interfaces.base import Undefined
@@ -89,6 +91,7 @@ def smooth(warped, mask):
     return smoothed, glob.glob(os.getcwd() + '/smooth/**', recursive=True)
                         
 def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
+    """Coregsitration of functional image to T1w image"""
     from nipype.interfaces.fsl import FLIRT
     from nipype.interfaces.base import Undefined
     from nipype import IdentityInterface
@@ -144,6 +147,7 @@ def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
 
 
 def regress(unsmoothed, mc_par, segmentations, mask, rest):
+    """Signal regression (WM, CSF, Global, motion)"""
     from nipype import Node
     from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
@@ -153,7 +157,7 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
     import nibabel as nib
     import os, re
     base_dir = os.getcwd()
-    
+    #For data driven analysis, regression is constant according to paper it is based on
     if rest:
         CSF = vars().get('CSF', True)
         WM = vars().get('WM', True)
@@ -244,6 +248,7 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
 
 
 def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat, start_img):
+    """Converts to MNI space or the inverse if conversion takes place after l1 analysis"""
     from nipype.interfaces.fsl import ApplyWarp, ConvertWarp, Threshold, ConvertXFM, FLIRT
     import re
     from nipype.interfaces.base import Undefined
