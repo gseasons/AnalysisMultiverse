@@ -182,7 +182,6 @@ def on_pop_gen(ga):
     for task in tasks:
         subjects = layout.get_subjects(task=task)
         subjects.sort()
-        subjects = subjects[0:1]
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -206,9 +205,6 @@ def on_pop_gen(ga):
             batch_size = pop_.shape[0]
             iterations = 1
         
-        last_batch = 0
-        batch_size = 8
-        iterations = 2
         
         for batch in range(iterations):
             if checkpoints:
@@ -223,8 +219,6 @@ def on_pop_gen(ga):
             else:
                 params = params_[:, batch*batch_size:]
                 pop = pop_[batch*batch_size:,:]
-            print(params.shape)
-            print(pop.shape)
                 
             pipeline = pipeline_ + batch * batch_size
             
@@ -265,24 +259,17 @@ def on_pop_gen(ga):
                 pipelines.inputs.inputnode.task = task
                 
                 plugin_args = {}
-                import ipyparallel as ipp
-                A = ipp.Cluster(n=6)
-                plugin_args = {'cluster_id': A.cluster_id, 'profile': A.profile}
-                #A.wait_for_engines
-                A = A.start_cluster_sync()
-                #print(A.ids)
-                config['processing'] = 'IPython'
-                #exit()
+                
                 if config['processing'] == 'SLURM':
                     config['processing'] = 'IPython'
                     plugin_args = {'profile': profile}
-                    #CHANGE SO SAVES TO REPRODUCIBILITY
+                    
                 if checkpoints and batch == last_batch:
                     pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
                 else:
                     save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                     
-                pipelines.run(plugin=config['processing'], plugin_args=plugin_args)#plugin='Linear', plugin_args={'status_callback': log_nodes_cb})#plugin=config, plugin_args=plugin_args)
+                pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
                 if not config['debug']:
                     shutil.rmtree(working_dir)
                 
@@ -321,7 +308,7 @@ def main():
         parent_selection_type = 'random'
         crossover_type = 'single_point'
         mutation_type = 'random'
-        sol_per_pop = 16#config['pipelines']
+        sol_per_pop = config['pipelines']
     
     gene_space = []
     dummy = 0
