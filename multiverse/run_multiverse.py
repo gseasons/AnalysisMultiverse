@@ -19,9 +19,12 @@ import sys
 import glob
 from pathlib import Path
 
-from nipype.utils.profiler import log_nodes_cb
+import shutil
 
-#TO DO: COMMENTS, CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
+from nipype.utils.profiler import log_nodes_cb
+#META GETTING DELETED TOO EARLY? HOPEFULLY JUST A FUNCTION OF ACCIDENTALLY NOT USING IPYTHON
+#TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
+#       Update so that we request whole nodes instead of CPUs on any number of nodes -> should limit failures
 
 exp_dir = '/scratch'
 working_dir = 'working_dir'
@@ -164,7 +167,7 @@ def on_pop_gen(ga):
     if check_pipes():
         return "stop"
     
-    checkpoints = glob.glob('processed/reproducibility/checkpoints/checkpoint_*.pkl')
+    checkpoints = glob.glob('/scratch/processed/reproducibility/checkpoints/checkpoint_*.pkl')
     
     if config['rerun'] or checkpoints:
         is_params = load('reproducibility', 'generation_'+str(generation)+'.pkl')
@@ -179,6 +182,7 @@ def on_pop_gen(ga):
     for task in tasks:
         subjects = layout.get_subjects(task=task)
         subjects.sort()
+        subjects = subjects[0:1]
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -202,13 +206,25 @@ def on_pop_gen(ga):
             batch_size = pop_.shape[0]
             iterations = 1
         
+        last_batch = 0
+        batch_size = 8
+        iterations = 2
+        
         for batch in range(iterations):
+            if checkpoints:
+                workflows = glob.glob('/scratch/processed/reproducibility/' + task + '_workflow*')
+                last_batch = len(workflows) - 1
+                if batch < last_batch:
+                    continue
+                
             if (batch+1) * batch_size < pop_.shape[0]:
                 params = params_[:, batch*batch_size:(batch+1)*batch_size]
                 pop = pop_[batch*batch_size:(batch+1)*batch_size,:]
             else:
                 params = params_[:, batch*batch_size:]
                 pop = pop_[batch*batch_size:,:]
+            print(params.shape)
+            print(pop.shape)
                 
             pipeline = pipeline_ + batch * batch_size
             
@@ -249,21 +265,30 @@ def on_pop_gen(ga):
                 pipelines.inputs.inputnode.task = task
                 
                 plugin_args = {}
-                config['processing'] = 'MultiProc'
+                import ipyparallel as ipp
+                A = ipp.Cluster(n=6)
+                plugin_args = {'cluster_id': A.cluster_id, 'profile': A.profile}
+                #A.wait_for_engines
+                A = A.start_cluster_sync()
+                #print(A.ids)
+                config['processing'] = 'IPython'
+                #exit()
                 if config['processing'] == 'SLURM':
                     config['processing'] = 'IPython'
                     plugin_args = {'profile': profile}
                     #CHANGE SO SAVES TO REPRODUCIBILITY
-                if checkpoints:
-                    pipelines = load('reproducibility', task + '_workflow.pkl')
+                if checkpoints and batch == last_batch:
+                    pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
                 else:
-                    save('reproducibility', task + '_workflow.pkl', pipelines)
+                    save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                     
                 pipelines.run(plugin=config['processing'], plugin_args=plugin_args)#plugin='Linear', plugin_args={'status_callback': log_nodes_cb})#plugin=config, plugin_args=plugin_args)
-            
+                if not config['debug']:
+                    shutil.rmtree(working_dir)
+                
     if 'num_generations' not in config:
         if checkpoints:
-            os.rename('processed/reproducibility/checkpoints', 'processed/reproducibility/checkpoints_finished')
+            os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_finished')
         sys.exit()#return "stop"
         #RUN PIPELINES IN BATCHES BASED ON NUMBER OF SUBJECTS/NUMBER OF PIPELINES -> max of ~0.83 GB PER SUBJECT PER PIPELINE
         #GA NOT SELECTED -> 1 generation, number of pipelines -> run in batches
@@ -296,7 +321,7 @@ def main():
         parent_selection_type = 'random'
         crossover_type = 'single_point'
         mutation_type = 'random'
-        sol_per_pop = config['pipelines']
+        sol_per_pop = 16#config['pipelines']
     
     gene_space = []
     dummy = 0

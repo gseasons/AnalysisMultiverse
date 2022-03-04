@@ -107,7 +107,6 @@ class DistributedPluginBase(PluginBase):
         self.proc_pending = None
         self.pending_tasks = []
         self.max_jobs = self.plugin_args.get("max_jobs", np.inf)
-        #self._load_state()
 
     def _prerun_check(self, graph):
         """Stub method to validate/massage graph and nodes before running"""
@@ -117,8 +116,9 @@ class DistributedPluginBase(PluginBase):
     
     def _load_state(self):
         files_missing = True
-        checkpoints = sorted(glob('processed/reproducibility/checkpoints/checkpoint_*.pkl'), key=lambda val: int(re.search('.*_([0-9]+)', val).group(1)))
+        checkpoints = glob('/scratch/processed/reproducibility/checkpoints/checkpoint_*.pkl')
         if checkpoints:
+            checkpoints = sorted(checkpoints, key=lambda val: int(re.search('.*_([0-9]+)', val).group(1)))
             count = 1
             _recent = checkpoints[-count]
             while files_missing:
@@ -135,18 +135,41 @@ class DistributedPluginBase(PluginBase):
                     except:
                         count += 1
                         _recent = checkpoints[-count]
-            #CODE THAT CAN BE ADAPTED TO ALLOW FOR TARGETED FILE DELETION -> HOPEFULLY NOT NEEDED
-# =============================================================================
-#             indices = np.nonzero((saved_state['refidx'].sum(axis=1)).__array__())[0] #== 0
-#             for idx in indices:
-#                 if saved_state['proc_done'][idx] and saved_state['proc_pending'][idx]:
-#                     outdir = saved_state['procs'][idx].output_dir()
-#                     if os.path.exists(outdir + '/result_' + re.search('.*/(.*)$', outdir).group(1) + '.pklz'):
-#                         continue
-#                     if not os.path.exists(outdir):
-#                         continue
-# =============================================================================
-                    
+                        
+            if 'iparallel' in self.__dict__:
+                indices = range(saved_state['refidx'].shape[0])
+                for idx in indices:
+                    outdir = saved_state['procs'][idx].output_dir()
+                    if saved_state['proc_done'][idx] and saved_state['proc_pending'][idx]:
+                        saved_state['proc_done'][idx] = False
+                        saved_state['proc_pending'][idx] = False
+                        if os.path.exists(outdir + '/result_' + re.search('.*/(.*)$', outdir).group(1) + '.pklz'):
+                            continue
+                        
+                        if os.path.exists(outdir):
+                            shutil.rmtree(outdir)
+                            
+                    elif not saved_state['proc_done'][idx] and not saved_state['proc_pending'][idx]:
+                        if os.path.exists(outdir + '/result_' + re.search('.*/(.*)$', outdir).group(1) + '.pklz'):
+                            continue
+                        
+                        if os.path.exists(outdir):
+                            shutil.rmtree(outdir)                        
+                            
+                saved_state['_taskid'] = saved_state['pending_tasks'][-1][0] - 1
+                saved_state['_taskid']
+                saved_state.pop('pending_tasks')
+            else:
+                indices = range(saved_state['refidx'].shape[0])
+                for idx in indices:
+                    outdir = saved_state['procs'][idx].output_dir()
+                    if not saved_state['proc_done'][idx] and not saved_state['proc_pending'][idx]:
+                        if os.path.exists(outdir + '/result_' + re.search('.*/(.*)$', outdir).group(1) + '.pklz'):
+                            continue
+                        
+                        if os.path.exists(outdir):
+                            shutil.rmtree(outdir)
+                
             saved_state['_config']['local_hash_check'] = False
             self.__dict__.update(saved_state)
     
@@ -154,16 +177,25 @@ class DistributedPluginBase(PluginBase):
         temp = self.__dict__.copy()
         temp['proc_done'] = np.array(self.__dict__['proc_done'])
         temp['proc_pending'] = np.array(self.__dict__['proc_pending'])
-        temp.pop('pool')
+        if 'pool' in temp:
+            temp.pop('pool')
+            temp.pop('processors')
+            temp.pop('memory_gb')
+            _task_obj = temp['_task_obj']
+            temp['_task_obj'] = _task_obj.fromkeys(_task_obj, {})
+        elif 'iparallel' in temp:
+            temp.pop('client_args')
+            temp.pop('iparallel')
+            temp.pop('taskclient')
+            temp.pop('taskmap')
+            
+        temp.pop('plugin_args')    
         temp.pop('timestamp')
-        temp.pop('processors')
-        temp.pop('memory_gb')
-        _task_obj = temp['_task_obj']
-        temp['_task_obj'] = _task_obj.fromkeys(_task_obj, {})
-        file_name = 'processed/reproducibility/checkpoints/checkpoint_' + str(int(stamp)) + '.pkl'
         
-        if not os.path.exists('processed/reproducibility/checkpoints'):
-            os.makedirs('processed/reproducibility/checkpoints')
+        file_name = '/scratch/processed/reproducibility/checkpoints/checkpoint_' + str(int(stamp)) + '.pkl'
+        
+        if not os.path.exists('/scratch/processed/reproducibility/checkpoints'):
+            os.makedirs('/scratch/processed/reproducibility/checkpoints')
         
         with open(file_name, 'wb') as f:
             pickle.dump(temp, f)
@@ -184,7 +216,6 @@ class DistributedPluginBase(PluginBase):
         self.mapnodesubids = {}
         # setup polling - TODO: change to threaded model
         notrun = []
-        
         self.hours_elapsed = 0
         if str2bool(self._config["execution"]["remove_node_directories"]):
             self._load_state()
@@ -196,7 +227,6 @@ class DistributedPluginBase(PluginBase):
             # Check if a job is available (jobs with all dependencies run)
             # https://github.com/nipy/nipype/pull/2200#discussion_r141605722
             jobs_ready = np.nonzero(~self.proc_done & (self.depidx.sum(0) == 0))[1]
-
             progress_stats = (
                 len(self.proc_done),
                 np.sum(self.proc_done ^ self.proc_pending),
@@ -205,6 +235,7 @@ class DistributedPluginBase(PluginBase):
                 len(self.pending_tasks),
                 np.sum(~self.proc_done & ~self.proc_pending),
             )
+            
             display_stats = progress_stats != old_progress_stats
             if display_stats:
                 logger.debug(
@@ -214,6 +245,7 @@ class DistributedPluginBase(PluginBase):
                     *progress_stats
                 )
                 old_progress_stats = progress_stats
+                
             toappend = []
             # trigger callbacks for any pending results
             while self.pending_tasks:
@@ -235,7 +267,13 @@ class DistributedPluginBase(PluginBase):
                     else:
                         assert self.proc_done[jobid] and self.proc_pending[jobid]
                         toappend.insert(0, (taskid, jobid))
-
+                
+                num_jobs = len(self.pending_tasks)
+                if num_jobs < self.max_jobs and (time() - loop_start) > poll_sleep_secs:
+                    submitted_ = self._send_procs_to_workers(updatehash=updatehash, graph=graph)
+                    if submitted_:
+                        loop_start = time()
+                    
             if toappend:
                 self.pending_tasks.extend(toappend)
 
@@ -245,17 +283,24 @@ class DistributedPluginBase(PluginBase):
             if display_stats:
                 logger.debug("Tasks currently running: %d. Pending: %d.", *presub_stats)
                 old_presub_stats = presub_stats
-            if num_jobs < self.max_jobs:
+                
+            if num_jobs < self.max_jobs and (time() - loop_start) > poll_sleep_secs:
+                submitted_ = self._send_procs_to_workers(updatehash=updatehash, graph=graph)
+            elif num_jobs > self.max_jobs:
+                submitted_ = False
+            else:
+                submitted_ = False
+                sleep_til = loop_start + poll_sleep_secs
+                sleep(max(0, sleep_til - time()))
+                
+                
+            if num_jobs < self.max_jobs and not submitted_:
                 self._send_procs_to_workers(updatehash=updatehash, graph=graph)
             elif display_stats:
                 logger.debug("Not submitting (max jobs reached)")
-
-            sleep_til = loop_start + poll_sleep_secs
-            sleep(max(0, sleep_til - time()))
-
+            
         self._remove_node_dirs()
         report_nodes_not_run(notrun)
-
         # close any open resources
         self._postrun_check()
 
@@ -345,7 +390,6 @@ class DistributedPluginBase(PluginBase):
             # Check if a job is available (jobs with all dependencies run)
             # https://github.com/nipy/nipype/pull/2200#discussion_r141605722
             jobids = np.nonzero(~self.proc_done & (self.depidx.sum(0) == 0))[1]
-
             if len(jobids) > 0:
                 # send all available jobs
                 logger.info(
@@ -399,8 +443,12 @@ class DistributedPluginBase(PluginBase):
                     logger.info(
                         "Finished submitting: %s ID: %d", self.procs[jobid], jobid
                     )
+                    submitted = True
             else:
+                submitted = False
                 break
+            
+        return submitted
 
     def _local_hash_check(self, jobid, graph):
         if not str2bool(self.procs[jobid].config["execution"]["local_hash_check"]):
@@ -511,7 +559,6 @@ class DistributedPluginBase(PluginBase):
     
     def _short_circuit_results(self, jobid):
         node_dir = self.procs[jobid].output_dir()
-        print(node_dir)
         results_file = glob(os.path.join(node_dir, "result_*.pklz"))[0]
         result_data = load_resultfile(results_file)
         result_out = dict(result=None, traceback=None)
@@ -576,7 +623,7 @@ class DistributedPluginBase(PluginBase):
             lst_out += vars(self).get('_'+str(idx), [])
             searched.append(idx)
             
-        return len(searched) != len(lst_out), lst_out, searched
+        return len(set(searched)) != len(set(lst_out)), lst_out, searched
 
 
     def _remove_node_dirs(self):
@@ -597,7 +644,7 @@ class DistributedPluginBase(PluginBase):
                         
                     for i in lst:
                         if self.proc_done[i] and (not self.proc_pending[i]):
-                            if self.procs[i] in indices_check:
+                            if i in indices_check or i not in indices:
                                 continue
                             self.refidx[i, i] = -1
                             outdir = self.procs[i].output_dir()
@@ -611,9 +658,14 @@ class DistributedPluginBase(PluginBase):
                                 % (self.procs[i]._id, outdir)
                             )
                             shutil.rmtree(outdir)
-                            if vars(self).get('_'+str(i), '') != '':#IF MULTIPLE COPIES IN DELETE -> ONLY REMOVE ONE
-                                self.delete = list(np.setdiff1d(self.delete, vars(self)['_'+str(i)]))
+                            if vars(self).get('_'+str(i), '') != '':
+                                for _i in vars(self)['_'+str(i)]:
+                                    if _i in self.delete:
+                                        self.delete.remove(_i)
                                 del vars(self)['_'+str(i)]
+                            
+                            if i in self.delete:
+                                self.delete.remove(i)
 
 
 class SGELikeBatchManagerBase(DistributedPluginBase):

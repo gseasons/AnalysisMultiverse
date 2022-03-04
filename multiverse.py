@@ -110,7 +110,9 @@ def main():
             #config['account'] = 'def-emazerol'
             #config['time'] = '0-05:00'
             #config['mem'] = '40000'
-            subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
+            #REQUEST FULL NODES INSTEAD OF BUNCH OF CPUs
+            #subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
+            subprocess.call(['sbatch', '--nodes=7', '--ntasks=32', '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem=400G'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
             
 
 if __name__ == "__main__":
