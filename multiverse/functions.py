@@ -432,7 +432,6 @@ def traverse(dic, flow, suffix, pipeline, to_run):
         dic_k = list(dic_.keys())
         start_pipe = [i for i in dic_k if isinstance(i, (int, np.integer))]
         split_nodes, connections = get_links(dic_, start_pipe)
-        print(connections)
         outstanding = False
         #check if pipelines split in wf stage
         if connections:
