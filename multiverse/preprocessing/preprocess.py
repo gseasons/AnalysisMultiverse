@@ -141,8 +141,8 @@ class preprocess(spatial_normalization):
                       (mcflirt, art, [('par_file', 'realignment_parameters')]),
                       (slicetimer, decision, [('slice_time_corrected_file', 'st')]),
                       (decision, flow.get_node('Fregistration'), [('start_img', 'start_img'),
-                                                                  ('corrected_img', 'corrected_img'),
-                                                                  ('mask', 'brainmask')]),
+                                                                  ('corrected_img', 'corrected_img')]),
+                             #                                     ('mask', 'brainmask')]), SHOULDN'T BE NEEDED
                       (decision, flow.get_node('Fmni'), [('mask', 'brainmask')]),
                       (decision, flow.get_node('Fmni'), [('start_img', 'start_img')]),
                       (flow.get_node('Fmni'), flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
@@ -158,7 +158,7 @@ class preprocess(spatial_normalization):
                       (fillmask, Fsmooth, [('out_file', 'mask')]),
                       ])
         
-    def coregistration(self, flow, func_dic):#SEARCH TO SEE IF BET ALREADY RUN AND OUTPUT SAVED
+    def coregistration(self, flow, func_dic):
         from preprocessing.functions import function_str, strip_container
         from preprocessing.workflows import check4brains
         

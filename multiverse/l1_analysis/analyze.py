@@ -27,7 +27,7 @@ class level1(spatial_normalization):
                                                    'event_file', 'TR', 'mask']), name='inputnode')
         
         intermediates = ['cope', 'varcope', 'feat_dir', 'seed']
-        files = ['design.con', 'design.mat', 'stats/cope*.nii.gz', 'stats/varcope*.nii.gz', 'stats/zstat*.nii.gz']
+        files = ['design.con', 'design.mat', 'stats/zstat*.nii.gz']
         
         self.l1(level1, func_dic)
         self.apply_warps(level1, split_half)

@@ -22,7 +22,6 @@ from pathlib import Path
 import shutil
 
 from nipype.utils.profiler import log_nodes_cb
-#META GETTING DELETED TOO EARLY? HOPEFULLY JUST A FUNCTION OF ACCIDENTALLY NOT USING IPYTHON
 #TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
 #       Update so that we request whole nodes instead of CPUs on any number of nodes -> should limit failures
 
@@ -170,12 +169,14 @@ def on_pop_gen(ga):
     checkpoints = glob.glob('/scratch/processed/reproducibility/checkpoints/checkpoint_*.pkl')
     
     if config['rerun'] or checkpoints:
+        generation = glob.glob('/scratch/processed/reproducibility/generation_*.pkl')
+        generation = len(generation) - 1
         is_params = load('reproducibility', 'generation_'+str(generation)+'.pkl')
         if type(is_params) != str:
             params_ = is_params
             pop_ = params_.transpose()
-            pipeline = generation * pop_.shape[0]
-            solution_start = pipeline
+            pipeline_ = generation * pop_.shape[0]
+            solution_start = pipeline_
     else:
         save('reproducibility', 'generation_'+str(generation)+'.pkl', params_)
     
@@ -205,7 +206,6 @@ def on_pop_gen(ga):
             batch_size = pop_.shape[0]
             iterations = 1
         
-        
         for batch in range(iterations):
             if checkpoints:
                 workflows = glob.glob('/scratch/processed/reproducibility/' + task + '_workflow*')
@@ -222,8 +222,12 @@ def on_pop_gen(ga):
                 
             pipeline = pipeline_ + batch * batch_size
             
+            if type(frame) != str:
+                already_run = set(range(frame.shape[0]))
+            else:
+                already_run = set()
             master, expand_inputs, unique_pipelines = generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle, pipeline, frame)
-    
+            
             un = unique_pipelines.shape[0]
             test_unique = unique_pipelines.astype(str).drop_duplicates(subset=unique_pipelines.columns.difference(['R', 'P', 'Score']))
             test_un = test_unique.shape[0]
@@ -233,24 +237,36 @@ def on_pop_gen(ga):
                 duplicates = duplicates.groupby(list(duplicates)).apply(lambda x: tuple(x.index)).to_list()
                 for dup in duplicates:
                     for row in dup:
+                        already_run.add(row)
+                        
                         if row == dup[0]:
                             continue
                         else:
                             unique_pipelines['R'][row] = unique_pipelines['R'][dup[0]]
                             unique_pipelines['P'][row] = unique_pipelines['P'][dup[0]]
                             unique_pipelines['Score'][row] = unique_pipelines['Score'][dup[0]]
-                            
-            to_run = [i for i in list(test_unique.index.values) if i >= pipeline]
-            out_frame = save('', task+'.pkl', unique_pipelines)
+            
+            to_run = [i for i in list(test_unique.index.values) if i >= pipeline and i not in already_run]
+            
+            if not to_run:
+                continue
+            
+            frame = unique_pipelines
             
             to_replace = [l-pipeline for l in range(pipeline, pipeline+pop.shape[0]) if l not in to_run]
+            
             if to_replace:
                 start_ind = min(to_run)
-                params[:,to_replace] = params[:,start_ind-pipeline].reshape(-1,1)
+                try:
+                    params[:,to_replace] = params[:,start_ind-pipeline].reshape(-1,1)
+                except IndexError:
+                    continue
                 if start_ind != pipeline:
                     params = np.delete(params, range(start_ind-pipeline), 1)
                 pop = params.transpose()
                 master, expand_inputs, _ = generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle, start_ind, frame)
+            
+            out_frame = save('', task+'.pkl', unique_pipelines)
             
             if 'anat' in types and 'func' in types and to_run:
                 pipelines = analysis(exp_dir, working_dir, data_dir, out_dir)
@@ -259,7 +275,7 @@ def on_pop_gen(ga):
                 pipelines.inputs.inputnode.task = task
                 
                 plugin_args = {}
-                
+
                 if config['processing'] == 'SLURM':
                     config['processing'] = 'IPython'
                     plugin_args = {'profile': profile}
@@ -271,6 +287,8 @@ def on_pop_gen(ga):
                     
                 pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
                 if not config['debug']:
+                    if os.path.exists('/scratch/processed/reproducibility/checkpoints'):
+                        os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
                     shutil.rmtree(working_dir)
                 
     if 'num_generations' not in config:

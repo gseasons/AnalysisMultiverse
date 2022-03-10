@@ -16,6 +16,7 @@ from traceback import format_exception
 
 import numpy as np
 from collections.abc import Iterable
+from collections import Counter
 import pickle, re
 
 from ... import logging
@@ -602,13 +603,13 @@ class DistributedPluginBase(PluginBase):
                         if os.path.isfile(str(key)) or os.path.isdir(str(key)):
                             if isinstance(it, dict) and key in it.values():
                                 vars(self)['_'+str(jobid)] = list(self.refidx[:, jobid].nonzero()[0])
-                                self.delete += list(self.refidx[:, jobid].nonzero()[0])
+                                self.delete += list(self.refidx[:, jobid].nonzero()[0]) #NODES THAT LEAD INTO CURRENT JOBID NODE
                                 return
-                            elif isinstance(it, (list, tuple, Iterable)) and key in it:
+                            elif isinstance(it, (list, tuple, Iterable)) and (key in it or any(it_.startswith(key) for it_ in it if isinstance(it_, str))):
                                 vars(self)['_'+str(jobid)] = list(self.refidx[:, jobid].nonzero()[0])
                                 self.delete += list(self.refidx[:, jobid].nonzero()[0])
                                 return
-                            elif isinstance(it, str) and key == it:
+                            elif isinstance(it, str) and (key == it or it.startswith(key)):
                                 vars(self)['_'+str(jobid)] = list(self.refidx[:, jobid].nonzero()[0])
                                 self.delete += list(self.refidx[:, jobid].nonzero()[0])
                             else:
@@ -631,6 +632,7 @@ class DistributedPluginBase(PluginBase):
         if str2bool(self._config["execution"]["remove_node_directories"]):
             indices = np.nonzero((self.refidx.sum(axis=1) == 0).__array__())[0]
             indices_check = np.setdiff1d(list(set(self.delete)), indices)
+            indices_count = Counter(self.delete)
             indices = np.setdiff1d(indices, list(set(self.delete)))
             for idx in indices:
                 if idx in self.mapnodesubids:
@@ -646,10 +648,28 @@ class DistributedPluginBase(PluginBase):
                         if self.proc_done[i] and (not self.proc_pending[i]):
                             if i in indices_check or i not in indices:
                                 continue
-                            self.refidx[i, i] = -1
+                            
                             outdir = self.procs[i].output_dir()
                             if not os.path.exists(outdir):
                                 continue
+                            
+                            if i in self.delete:
+                                self.delete.remove(i)
+                                if indices_count[i]:
+                                    indices_count[i] -= 1
+                                    continue
+                            #MIGHT JUST REVERT TO DELETING EVERYTHING FROM SET
+                            if vars(self).get('_'+str(i), '') != '':
+                                #self.delete = list(np.setdiff1d(self.delete, vars(self)['_'+str(i)]))
+                                for i_ in vars(self).get('_'+str(i)):
+                                    if i_ in self.delete:
+                                        self.delete.remove(i_)
+                                        if indices_count[i_]:
+                                            indices_count[i_] -= 1
+                                del vars(self)['_'+str(i)]
+                                
+                            self.refidx[i, i] = -1
+                            
                             logger.info(
                                 (
                                     "[node dependencies finished] "
@@ -658,15 +678,7 @@ class DistributedPluginBase(PluginBase):
                                 % (self.procs[i]._id, outdir)
                             )
                             shutil.rmtree(outdir)
-                            if vars(self).get('_'+str(i), '') != '':
-                                for _i in vars(self)['_'+str(i)]:
-                                    if _i in self.delete:
-                                        self.delete.remove(_i)
-                                del vars(self)['_'+str(i)]
                             
-                            if i in self.delete:
-                                self.delete.remove(i)
-
 
 class SGELikeBatchManagerBase(DistributedPluginBase):
     """Execute workflow with SGE/OGE/PBS like batch system"""

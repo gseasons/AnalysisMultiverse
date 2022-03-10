@@ -92,6 +92,7 @@ def smooth(warped, mask):
                         
 def registration(T1w, mask, start_img, corrected_img, bet, wm_file):
     """Coregsitration of functional image to T1w image"""
+    #NOTE: MASK NOT USED -> COULD REMOVE
     from nipype.interfaces.fsl import FLIRT
     from nipype.interfaces.base import Undefined
     from nipype import IdentityInterface
@@ -249,11 +250,12 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
 
 def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat, start_img):
     """Converts to MNI space or the inverse if conversion takes place after l1 analysis"""
-    from nipype.interfaces.fsl import ApplyWarp, ConvertWarp, Threshold, ConvertXFM, FLIRT
+    from nipype.interfaces.fsl import ApplyWarp, ConvertWarp, Threshold, ConvertXFM, FLIRT, Merge
+    from nipype.interfaces.fsl.maths import MaxImage
     import re
     from nipype.interfaces.base import Undefined
+    
     if not vars().get('warplater', True):
-        
         for i, file in enumerate(segmentations):
             segmentations[i] = ApplyWarp(in_file=file, ref_file=mniMask, field_file=warp, interp='nn').run().outputs.out_file
         
@@ -267,7 +269,11 @@ def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat, start_i
         start_warped = ApplyWarp(in_file=start_img, ref_file=mniMask, field_file=warp)
         
         start_img = start_warped.run().outputs.out_file
-        brainmask = ApplyWarp(in_file=brainmask, ref_file=mniMask, field_file=warp, interp='nn').run().outputs.out_file
+        if brainmask == '':
+            brainmask = Merge(in_files=segmentations, dimension='t').run().outputs.merged_file
+            brainmask = MaxImage(in_file=brainmask, dimension='T').run().outputs.out_file
+        else:
+            brainmask = ApplyWarp(in_file=brainmask, ref_file=mniMask, field_file=warp, interp='nn').run().outputs.out_file
     else:
         if not vars().get('concatenate', False):
             brainmask = Threshold(in_file=brain, thresh=0, args='-bin').run().outputs.out_file
@@ -276,6 +282,10 @@ def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat, start_i
             segform = ConvertXFM(in_file=out_mat, invert_xfm=True).run().outputs.out_file
             for i, file in enumerate(segmentations):
                 segmentations[i] = FLIRT(in_file=file, reference=warped, interp='nearestneighbour', apply_xfm=True, in_matrix_file=segform).run().outputs.out_file
+            
+            if brainmask == '':
+                brainmask = Merge(in_files=segmentations, dimension='t').run().outputs.merged_file
+                brainmask = MaxImage(in_file=brainmask, dimension='T').run().outputs.out_file
             
     return warped, brainmask, segmentations, warp, start_img
     

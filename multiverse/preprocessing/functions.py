@@ -24,7 +24,7 @@ def get_wm(files):
 
 def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
     """Ability to turn on/off slice timing correction as well as select median volume if not corrected to mean"""
-    from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT
+    from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT, ImageStats
     import nibabel as nib
     import os, re
     from shutil import copy2
@@ -40,10 +40,14 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
     if mc_mean and slice_correct:
         if resample:
             mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
+            if not int(ImageStats(in_file=mask, op_string='-R').run().outputs.out_stat[1]):
+                mask = ''
         return mean_vol, st, mask
     elif mc_mean:
         if resample:
             mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
+            if not int(ImageStats(in_file=mask, op_string='-R').run().outputs.out_stat[1]):
+                mask = ''
         return mean_vol, mc, mask
     elif slice_correct:
         size = nib.load(mc).shape
@@ -51,6 +55,8 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
         mc_m = get_mid.run().outputs.roi_file
         if resample:
             mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
+            if not int(ImageStats(in_file=mask, op_string='-R').run().outputs.out_stat[1]):
+                mask = ''
         return mc_m, st, mask
     else:
         size = nib.load(mc).shape
@@ -58,7 +64,10 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
         mc_m = get_mid.run().outputs.roi_file
         if resample:
             mask = FLIRT(in_file=mask, reference=mc_m, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file
+            if not int(ImageStats(in_file=mask, op_string='-R').run().outputs.out_stat[1]):
+                mask = ''
         return mc_m, mc, mask
+    
     
 def strip_container(in_file):
     """Remove container"""
