@@ -1,0 +1,2 @@
+flirt -in /Volumes/NewVolume/eggs/sub-094S6278_task-rest_bold_roi_mcf_mean_reg.nii.gz -ref /Volumes/NewVolume/eggs/sub-094S6278_T1w_corrected_xform_masked.nii.gz -out sub-094S6278_task-rest_bold_roi_mcf_mean_reg_flirt.nii.gz -omat sub-094S6278_task-rest_bold_roi_mcf_mean_reg_flirt.mat -dof 6 -interp sinc -noresample
+

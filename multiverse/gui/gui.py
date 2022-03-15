@@ -12,6 +12,7 @@ import json, pickle
 import tkinter as tk
 from tkinter import ttk
 from functools import partial
+import numpy as np
 
 class AutoScrollbar(tk.Scrollbar):
     def set(self, lo, hi):
@@ -277,25 +278,39 @@ class MultiverseConfig():
         self.cpus.insert(4, self.pipelines.get())
         self.cpus.grid(row=2, column=1)
         
-        ttk.Label(self.slurm_frame, text='Memory required per CPU (MB):').grid(row=3)
-        self.mem = ttk.Entry(self.slurm_frame)
-        self.mem.insert(4, str(6000))
-        self.mem.grid(row=3, column=1)
-        #NEED BETTER BENCHMARK
-        ttk.Label(self.slurm_frame, text='Time ~2H * (subject,scan,pipeline) / CPUs').grid(row=4)
+        ttk.Label(self.slurm_frame, text='CPUs per node (on compute cluster):').grid(row=3)
+        self.nodes = ttk.Entry(self.slurm_frame)
+        self.nodes.insert(4, '32')
+        self.nodes.grid(row=3, column=1)
         
-        ttk.Label(self.slurm_frame, text='Job time (Days-Hours:Mins):').grid(row=5)
+        ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
+        self.batches = ttk.Entry(self.slurm_frame)
+        self.batches.insert(4, str(np.ceil(int(self.pipelines.get())/4).astype(int)))
+        self.batches.grid(row=4, column=1)
+        
+        ttk.Label(self.slurm_frame, text='Memory required per CPU (MB):').grid(row=5)
+        self.mem = ttk.Entry(self.slurm_frame)
+        self.mem.insert(4, '6000')
+        self.mem.grid(row=5, column=1)
+        #NEED BETTER BENCHMARK
+        ttk.Label(self.slurm_frame, text='Time ~2H * (subject,scan,pipeline) / CPUs').grid(row=6)
+        
+        ttk.Label(self.slurm_frame, text='Job time (Days-Hours:Mins):').grid(row=7)
         self.time = ttk.Entry(self.slurm_frame)
         self.time.insert(4, '0-00:00')
-        self.time.grid(row=5, column=1)
+        self.time.grid(row=7, column=1)
         
         self.set_genetic = tk.Button(self.slurm_frame, text='Set', command=partial(self.set_slurm, False))
-        self.set_genetic.grid(row=6)
+        self.set_genetic.grid(row=8)
         
         self.slurm_frame_main.tkraise()
         
     def set_slurm(self, auto):
-        self.configure['ntasks'] = self.cpus.get()
+        node_request = int(self.cpus.get()) / int(self.nodes.get())
+        self.configure['nodes'] = str(np.ceil(node_request).astype(int))
+        self.configure['ntasks'] = str(np.ceil(node_request).astype(int) * int(self.nodes.get()))
+        self.configure['cpu_node'] = self.nodes.get()
+        self.configure['batches'] = int(self.batches.get())
         self.configure['account'] = self.account.get()
         self.configure['mem'] = self.mem.get()
         self.configure['time'] = self.time.get()

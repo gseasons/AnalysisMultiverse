@@ -18,12 +18,15 @@ import json
 import sys
 import glob
 from pathlib import Path
+import pandas as pd
+import re
 
 import shutil
 
 from nipype.utils.profiler import log_nodes_cb
 #TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
 #       Update so that we request whole nodes instead of CPUs on any number of nodes -> should limit failures
+# ENABLE USER TO SELECT BATCH SIZES IN GUI (HOW MANY RUNS THEY WANT PIPELINES TO BE SPLIT ACROSS)
 
 exp_dir = '/scratch'
 working_dir = 'working_dir'
@@ -130,6 +133,53 @@ def save(path, file, frame):
     
     return out
 
+def organize(task, out_frame):
+    """Creates a dictionary of final output files, and parameters for each pipeline - excludes parameters that are unchanged across all pipelines
+       
+       Structure:
+           {pipeline: {network: {contrast: file}},
+                      {parameters: {parameters}}
+                      }
+    """
+    processed = {'pipeline': {}}
+    pathlist = Path(out_dir).glob('**/*_corrected_[0-9]*')
+    dat_frame = out_frame
+    
+    with open(dat_frame, 'rb') as file:
+        dat_frame = pickle.load(file)
+        
+    comp = pd.DataFrame(np.roll(dat_frame.values, 1, axis=0), index=dat_frame.index)
+        
+    for path in pathlist:
+        path = str(path)
+        network = int(re.search('.*_network_([0-9]+)', path).group(1))
+        contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
+        pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
+        if pipeline in processed['pipeline']:
+            if network in processed['pipeline'][pipeline]['network']:
+                processed['pipeline'][pipeline]['network'][network]['contrast'][contrast] = path
+            else:
+                processed['pipeline'][pipeline]['network'][network] = {'contrast': {contrast: path}}
+        else:
+            processed['pipeline'][pipeline] = {'network': {network: {'contrast': {contrast: path}}}}
+            
+        pipe_dat = dat_frame.loc[pipeline]
+        for i, column in enumerate(dat_frame):
+            col = pipe_dat[column]
+            if (comp[i] == dat_frame[column]).all():
+                continue
+            
+            if 'parameters' not in processed['pipeline'][pipeline]:
+                processed['pipeline'][pipeline]['parameters'] = {}
+            
+            if isinstance(col, dict):
+                for key in col:
+                    processed['pipeline'][pipeline]['parameters'][key] = col[key]
+            else:
+                processed['pipeline'][pipeline]['parameters'][column] = col
+    
+    return save('', task+'_organized.pkl', processed)
+
 def check_pipes():
     unique = []
     for task in tasks:
@@ -199,12 +249,19 @@ def on_pop_gen(ga):
         #TODO: FIGURE OUT BATCH LATER -> ENSURE HAVE ENOUGH SPACE, GB_PER_PIPE INACCURATE FOR HOW THINGS WOULD RUN (only valid if can parallelize literally everything)
         gb_per_pipe = len(subjects) * (len(sessions) + 1) * (len(runs) + 1) * 0.83
         
+        batch_size = config['batches']
+        iterations = math.ceil(pop_.shape[0] / batch_size)
+        
         if (config['storage'] / gb_per_pipe) < pop_.shape[0]:
-            batch_size = int(config['storage'] / gb_per_pipe)
-            iterations = math.ceil(pop_.shape[0] / batch_size)
+            batch_size_ = int(config['storage'] / gb_per_pipe)
+            iterations_ = math.ceil(pop_.shape[0] / batch_size)
         else:
-            batch_size = pop_.shape[0]
-            iterations = 1
+            batch_size_ = pop_.shape[0]
+            iterations_ = 1
+            
+        if batch_size > batch_size_:
+            batch_size = batch_size_
+            iterations = iterations_
         
         for batch in range(iterations):
             if checkpoints:
@@ -212,6 +269,9 @@ def on_pop_gen(ga):
                 last_batch = len(workflows) - 1
                 if batch < last_batch:
                     continue
+                elif batch == last_batch:
+                    frame = load('', task+'.pkl')
+                    frame.drop(range(batch*batch_size, (batch+1)*batch_size))
                 
             if (batch+1) * batch_size < pop_.shape[0]:
                 params = params_[:, batch*batch_size:(batch+1)*batch_size]
@@ -286,6 +346,10 @@ def on_pop_gen(ga):
                     save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                     
                 pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
+                
+                #USE IN FINAL DATA ANALYSIS
+                organized = organize(task, out_frame)
+                
                 if not config['debug']:
                     if os.path.exists('/scratch/processed/reproducibility/checkpoints'):
                         os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
@@ -294,6 +358,8 @@ def on_pop_gen(ga):
     if 'num_generations' not in config:
         if checkpoints:
             os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_finished')
+        
+        #TODO: DATA ANALYSIS
         sys.exit()#return "stop"
         #RUN PIPELINES IN BATCHES BASED ON NUMBER OF SUBJECTS/NUMBER OF PIPELINES -> max of ~0.83 GB PER SUBJECT PER PIPELINE
         #GA NOT SELECTED -> 1 generation, number of pipelines -> run in batches

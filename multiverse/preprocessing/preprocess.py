@@ -161,7 +161,7 @@ class preprocess(spatial_normalization):
     def coregistration(self, flow, func_dic):
         from preprocessing.functions import function_str, strip_container
         from preprocessing.workflows import check4brains
-        
+        #CHANGE SO THAT CHECKS ALL SUBJECTS TO SEE IF BET -> IF ALL GRAB BET AND PASS TO BET_STRIP, ELSE ATTACH BET WORKFLOW
         bet = Node(Function(input_names=['data_dir', 'T1w'], output_names='out_file', function=check4brains), name='bet', n_procs=2, mem_gb=3) #init_brain_extraction_wf(name='bet')
         bet.inputs.data_dir = self.data_dir
         

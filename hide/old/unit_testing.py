@@ -8,134 +8,224 @@ Created on Wed Aug 11 11:48:57 2021
 from niworkflows.anat.ants import init_brain_extraction_wf
 from bids.layout import BIDSLayout
 from nipype import IdentityInterface, Node, DataSink
-from nipype import config, Workflow, Node, IdentityInterface
+from nipype import config, Workflow, Node, IdentityInterface, Function
 
 from nipype.utils.draw_gantt_chart import generate_gantt_chart
 
-def regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm):
-    from nipype import Node
-    from nipype.interfaces.base import Undefined
-    from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
-    from nipype.interfaces.fsl.maths import MeanImage
-    from nipype.interfaces.base import CommandLine
-    import numpy as np
-    import nibabel as nib
-    import os, re
-    base_dir = os.getcwd()
 
-    if rest:
-        CSF = vars().get('CSF', True)
-        WM = vars().get('WM', True)
-        GLOBAL = vars().get('GLOBAL', True)
-    else:
-        CSF = vars().get('CSF', False)
-        WM = vars().get('WM', False)
-        GLOBAL = vars().get('GLOBAL', False)
-
-    params = np.loadtxt(mc_par)
-    reho = np.loadtxt(mc_par)
-
-    if not vars().get('realignregress', True):
-        params = np.zeros((params.shape[0], 1))
-
-    resample = False
-    suffix = ''
-
-    reference = Node(MeanImage(in_file=unsmoothed, dimension='T'), name='reference', base_dir=base_dir).run().outputs.out_file
-    if nib.load(unsmoothed).shape[0:-1] != nib.load(mask).shape:
-        resample = True
-
-    csfmask = segmentations[0]
-    csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
-    if resample:
-        csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask', base_dir=base_dir).run().outputs.out_file
-    meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf', base_dir=base_dir)
-    csf = np.loadtxt(meancsf.run().outputs.out_file).reshape(-1, 1)
-    reho = np.hstack((reho, csf))
-
-    if CSF:
-        params = np.hstack((params, csf))
-        suffix += 'CSF_'
-
-    wmmask = segmentations[2]
-    wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
-    if resample:
-        wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask', base_dir=base_dir).run().outputs.out_file
-    meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf', base_dir=base_dir)
-    wm = np.loadtxt(meanwm.run().outputs.out_file).reshape(-1, 1)
-    reho = np.hstack((reho, wm))
-
-    if WM:
-        params = np.hstack((params, wm))
-        suffix += 'WM_'
-
-    if GLOBAL:
-        meanglob = Node(ImageMeants(in_file=unsmoothed, mask=mask), name='meanglob', base_dir=base_dir)
-        glob = np.loadtxt(meanglob.run().outputs.out_file).reshape(-1, 1)
-        params = np.hstack((params, glob))
-        reho = np.hstack((reho, glob))
-        suffix += 'GLOBAL'
-
-    name_ = os.getcwd() + '/' + suffix
-
-    if not vars().get('realignregress', True):
-        params = params[:,1:]
-
-    np.savetxt(name_ + '.txt', params)
-    cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_)
-    cl = CommandLine(cmd)
-    cl.run().runtime
-
-    name_reho = os.getcwd() + '/' + suffix + '_reho'
-    np.savetxt(name_ + '.txt', reho)
-    cmd = ('Text2Vest {name_}.txt {name_reho}.mat').format(name_=name_, name_reho=name_reho)
-    cl = CommandLine(cmd)
-    cl.run().runtime
-
-    forreho = unsmoothed
-    if np.any(params):
-        out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
-        glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
-
-        for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
-                search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
-                if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
-                else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
-
-        regressed = glm.run().outputs.out_res
-        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
-        unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
-
-    if np.any(reho) and not np.array_equal(reho, params):
-        out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
-        glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
-
-        for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
-                search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
-                if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
-                else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
-
-        regressed = glm.run().outputs.out_res
-        add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
-        forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
-
-    return unsmoothed, forreho
-
-unsmoothed = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_task-rest_bold_roi_mcf_st_warp.nii.gz'
-segmentations = ['/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_0_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_1_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_2_warp.nii.gz']
-CSF = True
-GLOBAL = False
-WM = True
-glm_dat_norm = True
-glm_demean = True
-glm_des_norm = True
-realignregress = False
-rest = True
-mc_par = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_subject_002S6053/_i_0/_i_3/mcflirt/sub-002S6053_task-rest_bold_roi_mcf.nii.gz.par'
-mask = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_thresh_flirt_warp.nii.gz'
-regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm)
-
-generate_gantt_chart('/Volumes/NewVolume/a/run_stats.log', 4)
+# =============================================================================
+# def registration(T1w, mask, start_img, corrected_img, bet, wm_file, bbr, regpre_interp, regpre_no_resample, applywarp_apply_isoxfm, applywarp_apply_xfm, applywarp_uses_qform, concatenate, regbbr_interp, regbbr_no_resample, applywarp_interp, applywarp_no_resample):
+#     from nipype.interfaces.fsl import FLIRT
+#     from nipype.interfaces.base import Undefined
+#     from nipype import IdentityInterface
+#     from nipype import Workflow, Node
+#     from os.path import join as opj
+#     import os, glob, re
+# 
+#     reg = Workflow(name='reg')
+#     reg.base_dir = os.getcwd()
+# 
+#     bbr = vars().get('bbr', True)
+#     concatenate = vars().get('concatenate', True)
+#     #CHECK TO VERIFY THAT DOF IS CALLED DOF
+#     regpre = Node(FLIRT(in_file=start_img, dof=6, reference=bet, output_type='NIFTI_GZ'), name='regpre')
+# 
+#     applywarp = Node(FLIRT(in_file=corrected_img, reference=bet, output_type='NIFTI_GZ'), name='applywarp')
+# 
+#     outnode =  Node(IdentityInterface(fields=['warped','out_mat', 'mask']), name='outnode')
+# 
+#     if bbr:
+#         regbbr = Node(FLIRT(cost='bbr', reference=T1w, in_file=start_img, output_type='NIFTI_GZ',
+#                         schedule=opj(os.getenv('FSLDIR'), 'etc/flirtsch/bbr.sch')), name='regbbr')
+#         regbbr.inputs.wm_seg = wm_file
+# 
+#         reg.connect([(regpre, regbbr, [('out_matrix_file', 'in_matrix_file')]),
+#                      (regbbr, outnode, [('out_matrix_file', 'out_mat')]),
+#                      ])
+# 
+#         if not concatenate:
+#             reg.connect([(regbbr, applywarp, [('out_matrix_file', 'in_matrix_file')])])
+# 
+#         node_reg = 'regbbr'
+#     else:
+#         reg.connect([(regpre, outnode, [('out_matrix_file', 'out_mat')]),
+#                      ])
+# 
+#         if not concatenate:
+#             reg.connect([(regpre, applywarp, [('out_matrix_file', 'in_matrix_file')])])
+# 
+#         node_reg = 'regpre'
+# 
+#     node_warp = 'applywarp'
+# 
+#     for param in ['regpre_interp', 'regpre_no_resample', 'applywarp_apply_isoxfm', 'applywarp_apply_xfm', 'applywarp_uses_qform', 'regbbr_interp', 'regbbr_no_resample', 'applywarp_interp', 'applywarp_no_resample']:
+#         search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
+#         if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
+#         else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
+# 
+#     reg.run()
+# 
+#     out_mat = glob.glob(os.getcwd() + '/reg/' + node_reg + '/*.mat')[0]
+#     if concatenate:
+#         warped = corrected_img
+#     else:
+#         warped = glob.glob(os.getcwd() + '/reg/' + node_warp + '/*.nii*')[0]
+# 
+#     return out_mat, warped, glob.glob(os.getcwd() + '/reg/**', recursive=True)
+# 
+# from os.path import join as opj
+# import os
+# 
+# mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+# applywarp_apply_isoxfm = ''
+# applywarp_apply_xfm = True
+# applywarp_interp = 'sinc'
+# applywarp_no_resample = True
+# applywarp_uses_qform = ''
+# bbr = True
+# concatenate = True
+# regbbr_interp = 'sinc'
+# regpre_interp = 'sinc'
+# regbbr_no_resample = True
+# regpre_no_resample = True
+# 
+# corrected_img = '/Volumes/NewVolume/eggs/sub-094S6278_task-rest_bold_roi_mcf.nii.gz'
+# bet = '/Volumes/NewVolume/eggs/sub-094S6278_T1w_corrected_xform_masked.nii.gz'
+# 
+# start_img = '/Volumes/NewVolume/eggs/sub-094S6278_task-rest_bold_roi_mcf_mean_reg.nii.gz'
+# wm_file = '/Volumes/NewVolume/eggs/sub-094S6278_T1w_corrected_xform_masked_seg_2.nii.gz'
+# T1w = '/Volumes/NewVolume/eggs/sub-094S6278_T1w.nii.gz'
+# 
+# 
+# registration(T1w, mask, start_img, corrected_img, bet, wm_file, bbr, regpre_interp, regpre_no_resample, applywarp_apply_isoxfm, applywarp_apply_xfm, applywarp_uses_qform, concatenate, regbbr_interp, regbbr_no_resample, applywarp_interp, applywarp_no_resample)
+# 
+# 
+# 
+# def regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm):
+#     from nipype import Node
+#     from nipype.interfaces.base import Undefined
+#     from nipype.interfaces.fsl import ImageMeants, Threshold, FLIRT, GLM, ImageStats, ImageMaths
+#     from nipype.interfaces.fsl.maths import MeanImage
+#     from nipype.interfaces.base import CommandLine
+#     import numpy as np
+#     import nibabel as nib
+#     import os, re
+#     base_dir = os.getcwd()
+# 
+#     if rest:
+#         CSF = vars().get('CSF', True)
+#         WM = vars().get('WM', True)
+#         GLOBAL = vars().get('GLOBAL', True)
+#     else:
+#         CSF = vars().get('CSF', False)
+#         WM = vars().get('WM', False)
+#         GLOBAL = vars().get('GLOBAL', False)
+# 
+#     params = np.loadtxt(mc_par)
+#     reho = np.loadtxt(mc_par)
+# 
+#     if not vars().get('realignregress', True):
+#         params = np.zeros((params.shape[0], 1))
+# 
+#     resample = False
+#     suffix = ''
+# 
+#     reference = Node(MeanImage(in_file=unsmoothed, dimension='T'), name='reference', base_dir=base_dir).run().outputs.out_file
+#     if nib.load(unsmoothed).shape[0:-1] != nib.load(mask).shape:
+#         resample = True
+# 
+#     csfmask = segmentations[0]
+#     csfmask = ImageMaths(in_file=csfmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+#     if resample:
+#         csfmask = Node(FLIRT(in_file=csfmask, reference=reference, apply_xfm=True, uses_qform=True), name='csfmask', base_dir=base_dir).run().outputs.out_file
+#     meancsf = Node(ImageMeants(in_file=unsmoothed, mask=csfmask), name='meancsf', base_dir=base_dir)
+#     csf = np.loadtxt(meancsf.run().outputs.out_file).reshape(-1, 1)
+#     reho = np.hstack((reho, csf))
+# 
+#     if CSF:
+#         params = np.hstack((params, csf))
+#         suffix += 'CSF_'
+# 
+#     wmmask = segmentations[2]
+#     wmmask = ImageMaths(in_file=wmmask, in_file2=mask, op_string='-mul').run().outputs.out_file
+#     if resample:
+#         wmmask = Node(FLIRT(in_file=wmmask, reference=reference, apply_xfm=True, uses_qform=True), name='wmmask', base_dir=base_dir).run().outputs.out_file
+#     meanwm = Node(ImageMeants(in_file=unsmoothed, mask=wmmask), name='meancsf', base_dir=base_dir)
+#     wm = np.loadtxt(meanwm.run().outputs.out_file).reshape(-1, 1)
+#     reho = np.hstack((reho, wm))
+# 
+#     if WM:
+#         params = np.hstack((params, wm))
+#         suffix += 'WM_'
+# 
+#     if GLOBAL:
+#         meanglob = Node(ImageMeants(in_file=unsmoothed, mask=mask), name='meanglob', base_dir=base_dir)
+#         glob = np.loadtxt(meanglob.run().outputs.out_file).reshape(-1, 1)
+#         params = np.hstack((params, glob))
+#         reho = np.hstack((reho, glob))
+#         suffix += 'GLOBAL'
+# 
+#     name_ = os.getcwd() + '/' + suffix
+# 
+#     if not vars().get('realignregress', True):
+#         params = params[:,1:]
+# 
+#     np.savetxt(name_ + '.txt', params)
+#     cmd = ('Text2Vest {name_}.txt {name_}.mat').format(name_=name_)
+#     cl = CommandLine(cmd)
+#     cl.run().runtime
+# 
+#     name_reho = os.getcwd() + '/' + suffix + '_reho'
+#     np.savetxt(name_ + '.txt', reho)
+#     cmd = ('Text2Vest {name_}.txt {name_reho}.mat').format(name_=name_, name_reho=name_reho)
+#     cl = CommandLine(cmd)
+#     cl.run().runtime
+# 
+#     forreho = unsmoothed
+#     if np.any(params):
+#         out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
+#         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
+# 
+#         for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
+#                 search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
+#                 if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
+#                 else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
+# 
+#         regressed = glm.run().outputs.out_res
+#         add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+#         unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+# 
+#     if np.any(reho) and not np.array_equal(reho, params):
+#         out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
+#         glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
+# 
+#         for param in ['glm_dat_norm', 'glm_demean', 'glm_des_norm']:
+#                 search = re.search('([A-Za-z]+)_([A-Za-z_]+)', param)
+#                 if vars()[param]: setattr(vars()[search.group(1)].inputs, search.group(2), vars()[param])
+#                 else: setattr(vars()[search.group(1)].inputs, search.group(2), Undefined)
+# 
+#         regressed = glm.run().outputs.out_res
+#         add = abs(ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0])
+#         forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+# 
+#     return unsmoothed, forreho
+# 
+# unsmoothed = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_task-rest_bold_roi_mcf_st_warp.nii.gz'
+# segmentations = ['/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_0_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_1_warp.nii.gz', '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_seg_2_warp.nii.gz']
+# CSF = True
+# GLOBAL = False
+# WM = True
+# glm_dat_norm = True
+# glm_demean = True
+# glm_des_norm = True
+# realignregress = False
+# rest = True
+# mc_par = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_subject_002S6053/_i_0/_i_3/mcflirt/sub-002S6053_task-rest_bold_roi_mcf.nii.gz.par'
+# mask = '/Volumes/NewVolume/a2/working_dir/fmri/preprocess/_i_0/_i_0/_subject_002S6053/_i_3/_i_3/_i_3/Fmni/sub-002S6053_T1w_corrected_xform_masked_thresh_flirt_warp.nii.gz'
+# regress(unsmoothed, mc_par, segmentations, mask, rest, CSF, WM, GLOBAL, glm_dat_norm, glm_demean, realignregress, glm_des_norm)
+# 
+# generate_gantt_chart('/Volumes/NewVolume/a/run_stats.log', 4)
+# =============================================================================
 
 # =============================================================================
 # import os
@@ -163,21 +253,45 @@ generate_gantt_chart('/Volumes/NewVolume/a/run_stats.log', 4)
 # =============================================================================
 
 from pathlib import Path
-import re
-processed = {'network': {}}
+import re, pickle
+import numpy as np
+import pandas as pd
+processed = {'pipeline': {}}
 pathlist = Path('/Volumes/NewVolume/docker_test/processed').glob('**/*_corrected_[0-9]*')
+dat_frame = '/Volumes/NewVolume/eggs/rest.pkl'
+with open(dat_frame, 'rb') as file:
+    dat_frame = pickle.load(file)
+    
+comp = pd.DataFrame(np.roll(dat_frame.values,1, axis=0), index=dat_frame.index)
+    
 for path in pathlist:
     path = str(path)
     network = int(re.search('.*_network_([0-9]+)', path).group(1))
     contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
     pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
-    if network in processed['network']:
-        if contrast in processed['network'][network]['contrast']:
-            processed['network'][network]['contrast'][contrast]['pipeline'][pipeline] = path
+    if pipeline in processed['pipeline']:
+        if network in processed['pipeline'][pipeline]['network']:
+            processed['pipeline'][pipeline]['network'][network]['contrast'][contrast] = path
         else:
-            processed['network'][network]['contrast'][contrast] = {'pipeline': {pipeline: path}}
+            processed['pipeline'][pipeline]['network'][network] = {'contrast': {contrast: path}}
     else:
-        processed['network'] = {network: {'contrast': {contrast: {'pipeline': {pipeline: path}}}}}
+        processed['pipeline'][pipeline] = {'network': {network: {'contrast': {contrast: path}}}}
+        
+    
+    pipe_dat = dat_frame.loc[pipeline]
+    for i, column in enumerate(dat_frame):
+        col = pipe_dat[column]
+        if (comp[i] == dat_frame[column]).all():
+            continue
+        
+        if 'parameters' not in processed['pipeline'][pipeline]:
+            processed['pipeline'][pipeline]['parameters'] = {}
+        
+        if isinstance(col, dict):
+            for key in col:
+                processed['pipeline'][pipeline]['parameters'][key] = col[key]
+        else:
+            processed['pipeline'][pipeline]['parameters'][column] = col
 
 A=3
 

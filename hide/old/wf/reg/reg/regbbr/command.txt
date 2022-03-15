@@ -1,0 +1,2 @@
+flirt -in /Volumes/NewVolume/a_copy/sub-031S0618_task-rest_bold_roi_mcf_roi.nii.gz -ref /Volumes/NewVolume/a_copy/sub-031S0618_T1w.nii.gz -out sub-031S0618_task-rest_bold_roi_mcf_roi_flirt.nii.gz -omat sub-031S0618_task-rest_bold_roi_mcf_roi_flirt.mat -cost bbr -init /Users/grahamseasons/fMRI/analysis_multiverse/hide/old/wf/reg/reg/regpre/sub-031S0618_task-rest_bold_roi_mcf_roi_flirt.mat -interp spline -noresample -schedule /usr/local/fsl/etc/flirtsch/bbr.sch -wmseg /Volumes/NewVolume/a_copy/sub-031S0618_T1w_corrected_xform_masked_seg_2.nii.gz
+
