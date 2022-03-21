@@ -7,7 +7,7 @@
 # pull request on our GitHub repository:
 # 
 #     https://github.com/ReproNim/neurodocker
-# THIS CAN BE REPLACE WITH:
+# THIS CAN BE REPLACED WITH:
 # Bootstrap: docker
 # From: gseasons/multiverse:cluster
 #

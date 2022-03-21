@@ -1,2 +1,0 @@
-flirt -in /Volumes/NewVolume/eggs/sub-094S6278_task-rest_bold_roi_mcf_mean_reg.nii.gz -ref /Volumes/NewVolume/eggs/sub-094S6278_T1w.nii.gz -out sub-094S6278_task-rest_bold_roi_mcf_mean_reg_flirt.nii.gz -omat sub-094S6278_task-rest_bold_roi_mcf_mean_reg_flirt.mat -cost bbr -init /Users/grahamseasons/fMRI/analysis_multiverse/hide/old/reg/regpre/sub-094S6278_task-rest_bold_roi_mcf_mean_reg_flirt.mat -interp sinc -noresample -schedule /usr/local/fsl/etc/flirtsch/bbr.sch -wmseg /Volumes/NewVolume/eggs/sub-094S6278_T1w_corrected_xform_masked_seg_2.nii.gz
-

@@ -76,7 +76,7 @@ class analysis:
         bids_dg.iterables = ('subject', subjects)
         
         pre = preprocess(task, pipeline, self.out_dir, self.data_dir)
-        pre = pre.construct(dynamic)
+        pre = pre.construct(dynamic, subjects)
         
         l1 = level1(task, pipeline, self.out_dir, networks=networks)
         l1 = l1.construct(dynamic, split_half)

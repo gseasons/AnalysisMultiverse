@@ -11,6 +11,12 @@ import re, random
 from collections import Counter
 import numpy as np
 import pandas as pd
+import pickle
+from pathlib import Path
+import os
+
+exp_dir = '/scratch'
+out_dir = exp_dir + '/processed'
 
 def no_mask(file):
     raise FileNotFoundError("Specified mask '{m}' does not exist".format(m=file))
@@ -497,6 +503,10 @@ def traverse(dic, flow, suffix, pipeline, to_run):
             vals = list(const.values())
             for i, k in enumerate(keys):
                 k_var = re.search(node+'_([A-Za-z_]+)', k).group(1)
+                
+                if flow.get_node(wf).get_node(node) == None:
+                    continue
+                
                 if k_var in flow.get_node(wf).get_node(node).inputs.get():
                     setattr(flow.get_node(wf).get_node(node).inputs, k_var, vals[i])
         
@@ -612,6 +622,73 @@ def define_paths(container, dictionary, indexes):
             out_dic[subkey] = dictionary[key][subkey]
         
     return container, out_dic, index_
+
+def load(path, file):
+    out = os.path.join(out_dir, path, file)
+    if os.path.isfile(out):
+        with open(out, 'rb') as f:
+            loaded = pickle.load(f)
+    else:
+        loaded = ''
+    
+    return loaded
+
+def save(path, file, frame):
+    out = os.path.join(out_dir, path)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    out = os.path.join(out, file)
+        
+    with open(out, 'wb') as f:
+        pickle.dump(frame, f)
+    
+    return out
+
+def organize(task, out_frame):
+    """Creates a dictionary of final output files, and parameters for each pipeline - excludes parameters that are unchanged across all pipelines
+       
+       Structure:
+           {pipeline: {network: {contrast: file}},
+                      {parameters: {parameters}}
+                      }
+    """
+    processed = {'pipeline': {}}
+    pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
+    dat_frame = out_frame
+    
+    with open(dat_frame, 'rb') as file:
+        dat_frame = pickle.load(file)
+        
+    comp = pd.DataFrame(np.roll(dat_frame.values, 1, axis=0), index=dat_frame.index)
+        
+    for path in pathlist:
+        path = str(path)
+        network = int(re.search('.*_network_([0-9]+)', path).group(1))
+        contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
+        pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
+        if pipeline in processed['pipeline']:
+            if network in processed['pipeline'][pipeline]['network']:
+                processed['pipeline'][pipeline]['network'][network]['contrast'][contrast] = path
+            else:
+                processed['pipeline'][pipeline]['network'][network] = {'contrast': {contrast: path}}
+        else:
+            processed['pipeline'][pipeline] = {'network': {network: {'contrast': {contrast: path}}}}
+            
+        pipe_dat = dat_frame.loc[pipeline]
+        for i, column in enumerate(dat_frame):
+            col = pipe_dat[column]
+            if (comp[i] == dat_frame[column]).all():
+                continue
+            
+            if 'parameters' not in processed['pipeline'][pipeline]:
+                processed['pipeline'][pipeline]['parameters'] = {}
+            
+            if isinstance(col, dict):
+                for key in col:
+                    processed['pipeline'][pipeline]['parameters'][key] = col[key]
+            else:
+                processed['pipeline'][pipeline]['parameters'][column] = col
+    
+    return save('', task+'_organized.pkl', processed)
 
 
 

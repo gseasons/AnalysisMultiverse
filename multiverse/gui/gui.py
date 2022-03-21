@@ -288,9 +288,9 @@ class MultiverseConfig():
         self.batches.insert(4, str(np.ceil(int(self.pipelines.get())/4).astype(int)))
         self.batches.grid(row=4, column=1)
         
-        ttk.Label(self.slurm_frame, text='Memory required per CPU (MB):').grid(row=5)
+        ttk.Label(self.slurm_frame, text='Memory required per CPU (GB):').grid(row=5)
         self.mem = ttk.Entry(self.slurm_frame)
-        self.mem.insert(4, '6000')
+        self.mem.insert(4, '6')
         self.mem.grid(row=5, column=1)
         #NEED BETTER BENCHMARK
         ttk.Label(self.slurm_frame, text='Time ~2H * (subject,scan,pipeline) / CPUs').grid(row=6)
@@ -516,12 +516,12 @@ class MultiverseConfig():
         self.out_dic['level1']['~construct~Finfo_rest_seedinfo'] = {'gene': []}
         
         if self.atlas.get():
-            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(self.atlas.get())
+            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(0)
         if self.data.get():
-            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(self.data.get())
+            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(1)
             modes[0] = 1
         if self.coords.get():
-            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(self.coords.get())
+            self.out_dic['level1']['~construct~Finfo_rest_type']['gene'].append(2)
             
         if not sum(modes):
             raise ValueError('At least one seed definition type must be selected')
@@ -599,7 +599,7 @@ class MultiverseConfig():
                         vars(self)['coords_add'+str(val)] = tk.Button(vars(self)['define_network'+str(val)], text='Add Coordinates', command=partial(self.add_option, i, val, 'called_'+str(i)+'_'+str(val), True, networks, modes))
                         vars(self)['coords_add'+str(val)].grid(row=counter+val, column=1)
                         counter += 1
-        
+        print(self.out_dic['level1'])
         self.main_set_butt = tk.Button(self.define_frame, text='Set', command=partial(self.ret, 'main'))
         self.main_set_butt['state'] = 'disabled'
         self.main_set_butt.grid(row=counter+val, column=0)

@@ -11,7 +11,7 @@ import os, math
 from os.path import join as opj
 from analysis_pipeline import analysis
 from bids.layout import BIDSLayout
-from functions import generate_dictionaries
+from functions import generate_dictionaries, organize, save, load
 import pickle
 from nipype import config as conf
 import json
@@ -25,12 +25,10 @@ import shutil
 
 from nipype.utils.profiler import log_nodes_cb
 #TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
-#       Update so that we request whole nodes instead of CPUs on any number of nodes -> should limit failures
-# ENABLE USER TO SELECT BATCH SIZES IN GUI (HOW MANY RUNS THEY WANT PIPELINES TO BE SPLIT ACROSS)
 
-exp_dir = '/scratch'
+exp_dir = '/Volumes/NewVolume/a'#'/scratch'
 working_dir = 'working_dir'
-data_dir = '/data'
+data_dir = '/Volumes/NewVolume/super_agers'#'/data'
 out_dir = exp_dir + '/processed'
 mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
 dir = os.path.dirname(os.path.abspath(__file__))
@@ -109,77 +107,6 @@ solution_start = 0
 layout = BIDSLayout(data_dir)
 tasks = layout.get_tasks()
 
-def load(path, file):
-    out = os.path.join(out_dir, path, file)
-    if os.path.isfile(out):
-        with open(out, 'rb') as f:
-            loaded = pickle.load(f)
-    else:
-        loaded = ''
-    
-    return loaded
-
-def save(path, file, frame):
-    out = os.path.join(out_dir, path)
-    Path(out).mkdir(parents=True, exist_ok=True)
-    out = os.path.join(out, file)
-# =============================================================================
-#     if not os.path.isdir(out_dir):
-#         os.mkdir(out_dir)
-# =============================================================================
-        
-    with open(out, 'wb') as f:
-        pickle.dump(frame, f)
-    
-    return out
-
-def organize(task, out_frame):
-    """Creates a dictionary of final output files, and parameters for each pipeline - excludes parameters that are unchanged across all pipelines
-       
-       Structure:
-           {pipeline: {network: {contrast: file}},
-                      {parameters: {parameters}}
-                      }
-    """
-    processed = {'pipeline': {}}
-    pathlist = Path(out_dir).glob('**/*_corrected_[0-9]*')
-    dat_frame = out_frame
-    
-    with open(dat_frame, 'rb') as file:
-        dat_frame = pickle.load(file)
-        
-    comp = pd.DataFrame(np.roll(dat_frame.values, 1, axis=0), index=dat_frame.index)
-        
-    for path in pathlist:
-        path = str(path)
-        network = int(re.search('.*_network_([0-9]+)', path).group(1))
-        contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
-        pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
-        if pipeline in processed['pipeline']:
-            if network in processed['pipeline'][pipeline]['network']:
-                processed['pipeline'][pipeline]['network'][network]['contrast'][contrast] = path
-            else:
-                processed['pipeline'][pipeline]['network'][network] = {'contrast': {contrast: path}}
-        else:
-            processed['pipeline'][pipeline] = {'network': {network: {'contrast': {contrast: path}}}}
-            
-        pipe_dat = dat_frame.loc[pipeline]
-        for i, column in enumerate(dat_frame):
-            col = pipe_dat[column]
-            if (comp[i] == dat_frame[column]).all():
-                continue
-            
-            if 'parameters' not in processed['pipeline'][pipeline]:
-                processed['pipeline'][pipeline]['parameters'] = {}
-            
-            if isinstance(col, dict):
-                for key in col:
-                    processed['pipeline'][pipeline]['parameters'][key] = col[key]
-            else:
-                processed['pipeline'][pipeline]['parameters'][column] = col
-    
-    return save('', task+'_organized.pkl', processed)
-
 def check_pipes():
     unique = []
     for task in tasks:
@@ -233,6 +160,7 @@ def on_pop_gen(ga):
     for task in tasks:
         subjects = layout.get_subjects(task=task)
         subjects.sort()
+        subjects = subjects[0:2]
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -246,10 +174,10 @@ def on_pop_gen(ga):
             frame = ''
         else:
             frame = load('', task+'.pkl')
-        #TODO: FIGURE OUT BATCH LATER -> ENSURE HAVE ENOUGH SPACE, GB_PER_PIPE INACCURATE FOR HOW THINGS WOULD RUN (only valid if can parallelize literally everything)
+        #PROBABLY CHANGE SO THAT BATCH ONLY COMES INTO PLAY IF RUNNING MULTIPROC OR SLURM
         gb_per_pipe = len(subjects) * (len(sessions) + 1) * (len(runs) + 1) * 0.83
         
-        batch_size = config['batches']
+        batch_size = 50#pop_.shape[0] #config['batches']
         iterations = math.ceil(pop_.shape[0] / batch_size)
         
         if (config['storage'] / gb_per_pipe) < pop_.shape[0]:
@@ -329,31 +257,45 @@ def on_pop_gen(ga):
             out_frame = save('', task+'.pkl', unique_pipelines)
             
             if 'anat' in types and 'func' in types and to_run:
-                pipelines = analysis(exp_dir, working_dir, data_dir, out_dir)
-                pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)
-                pipelines.inputs.inputnode.mask = mask
-                pipelines.inputs.inputnode.task = task
-                
-                plugin_args = {}
-
-                if config['processing'] == 'SLURM':
-                    config['processing'] = 'IPython'
-                    plugin_args = {'profile': profile}
+                if config['processing'] == 'SLURM' and 'num_generations' not in config:
+                    pipelines = analysis(exp_dir, task+'_'+working_dir+'_'+str(batch), data_dir, out_dir)
+                    pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)
+                    pipelines.inputs.inputnode.mask = mask
+                    pipelines.inputs.inputnode.task = task
                     
-                if checkpoints and batch == last_batch:
-                    pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
-                else:
                     save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
+                    if batch == (iterations-1):
+                        sys.exit()
+                else:
+                    pipelines = analysis(exp_dir, task+'_'+working_dir+'_'+str(batch), data_dir, out_dir)
+                    pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)
+                    pipelines.inputs.inputnode.mask = mask
+                    pipelines.inputs.inputnode.task = task
                     
-                pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
+                    plugin_args = {'task': task, 'batch': batch}
+    
+                    if False:#config['processing'] == 'SLURM':
+                        config['processing'] = 'IPython'
+                        plugin_args['profile'] = profile
+                    
+                    config['processing'] = 'MultiProc'
+                        
+                    if checkpoints and batch == last_batch:
+                        pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
+                    else:
+                        save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
+                        
+                    pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
                 
-                #USE IN FINAL DATA ANALYSIS
-                organized = organize(task, out_frame)
-                
-                if not config['debug']:
-                    if os.path.exists('/scratch/processed/reproducibility/checkpoints'):
-                        os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
-                    shutil.rmtree(working_dir)
+                    #USE IN FINAL DATA ANALYSIS
+                    organized = organize(task, out_frame)
+                    
+                    if not config['debug']:
+# =============================================================================
+#                         if os.path.exists('/scratch/processed/reproducibility/checkpoints'):
+#                             os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
+# =============================================================================
+                        shutil.rmtree('/scratch/' + working_dir)
                 
     if 'num_generations' not in config:
         if checkpoints:
@@ -392,7 +334,7 @@ def main():
         parent_selection_type = 'random'
         crossover_type = 'single_point'
         mutation_type = 'random'
-        sol_per_pop = config['pipelines']
+        sol_per_pop = 200#config['pipelines']
     
     gene_space = []
     dummy = 0

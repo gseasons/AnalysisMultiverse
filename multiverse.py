@@ -6,9 +6,10 @@ Created on Mon Nov  1 14:45:59 2021
 @author: grahamseasons
 """
 import subprocess
-import argparse, sys, os, json, pickle
+import argparse, sys, os, json, pickle, re
 from multiverse.gui.gui import MultiverseConfig
 from os.path import join as opj
+import numpy as np
 
 dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -112,7 +113,36 @@ def main():
             #config['mem'] = '40000'
             #REQUEST FULL NODES INSTEAD OF BUNCH OF CPUs
             #subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
-            subprocess.call(['sbatch', '--nodes={0}'.format(config['nodes']), '--ntasks={0}'.format([config['ntasks']]), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
+            if config['processing'] == 'SLURM' and 'num_generations' not in config:
+                config['nodes'] = '1'
+                config['ntasks'] = config['cpu_node']
+                
+                split_ = re.split('-|:', config['time'])
+                print(split_)
+                time_s = 0
+                for k, sp in enumerate(split_):
+                    if not k:
+                        time_s += int(sp) * 24 * 3600
+                    elif k == 1:
+                        time_s += int(sp) * 3600
+                    elif k == 2:
+                        time_s += int(sp) * 60
+                    else:
+                        time_s += int(sp)
+                time_s = time_s / config['pipelines'] * np.ceil(int(config['cpu_node']) / 4).astype(int)
+                
+                days = int(time_s / (24 * 3600))
+                hours = max(int(time_s / 3600) - days * 24, 0)
+                minutes = max(int(time_s / 60) - days * 24 * 60 - hours * 60, 0)
+                seconds = max(int(time_s) - days * 24 * 3600 - hours * 3600 - minutes * 60, 0)
+                
+                config['time'] =  str(days) + '-' + str(hours) + ':' + str(minutes) + ':' + str(seconds)
+                config['mem'] = np.ceil(float(config['mem']) * int(config['cpu_node'])).astype(int).astype(str)
+                config['batch'] = np.ceil(int(config['cpu_node']) / 4).astype(int)
+                
+                subprocess.call(['{0}/configuration/intermediate.sh'.format(code_dir), args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']])
+            else:
+                subprocess.call(['sbatch', '--nodes={0}'.format(config['nodes']), '--ntasks={0}'.format([config['ntasks']]), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
             
 
 if __name__ == "__main__":

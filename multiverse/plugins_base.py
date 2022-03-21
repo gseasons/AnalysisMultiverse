@@ -117,7 +117,11 @@ class DistributedPluginBase(PluginBase):
     
     def _load_state(self):
         files_missing = True
-        checkpoints = glob('/scratch/processed/reproducibility/checkpoints/checkpoint_*.pkl')
+        
+        task = self.__dict__['plugin_args']['task']
+        batch = self.__dict__['plugin_args']['batch']
+        
+        checkpoints = glob('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_*.pkl')
         if checkpoints:
             checkpoints = sorted(checkpoints, key=lambda val: int(re.search('.*_([0-9]+)', val).group(1)))
             count = 1
@@ -189,14 +193,17 @@ class DistributedPluginBase(PluginBase):
             temp.pop('iparallel')
             temp.pop('taskclient')
             temp.pop('taskmap')
-            
+        
+        task = temp['plugin_args']['task']
+        batch = temp['plugin_args']['batch']
+        
         temp.pop('plugin_args')    
         temp.pop('timestamp')
         
-        file_name = '/scratch/processed/reproducibility/checkpoints/checkpoint_' + str(int(stamp)) + '.pkl'
+        file_name = '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_' + str(int(stamp)) + '.pkl'
         
-        if not os.path.exists('/scratch/processed/reproducibility/checkpoints'):
-            os.makedirs('/scratch/processed/reproducibility/checkpoints')
+        if not os.path.exists('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)):
+            os.makedirs('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
         
         with open(file_name, 'wb') as f:
             pickle.dump(temp, f)

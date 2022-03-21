@@ -12,6 +12,9 @@ Software for automated multiverse analysis for fMRI
     a. This requires the output directory to contain the reproducibility directory (including generation files) of the analysis to reproduce
     b. Similarly, the files multiverse/configuration/general_configuration.pkl and multiverse/configuration/multiverse_configuration.pkl should be the same as the analysis to be reproduced
   4. Note: It may take a long time from the workflow calling .run() to actual execution (connecting nodes/inputs/outputs) - important in multiverse, as the more nodes, subjects, and pipelines the longer this will take (important to ask if some way to request fewer resources while this happening, then step up to needed amount once starts running)
+  5. Recent update works by submitting multiple partial jobs (i.e. 25 jobs for 200 pipelines -> 25 nodes with 32 cpus, for 8 pipelines) instead of 1 massive job
+    a. Calculates runtime for each job by subdividing total given runtime (for 1 massive job) by the number of subjobs
+    b. If using split_half (still in development/untested), remains as 1 large job, as generations act as batches, and are dependent on each other
   
 # Node Naming Conventions/Multiverse Modification
 - To add more parameters to multiverse analysis, edit the default.json file in configuration
@@ -26,7 +29,8 @@ Software for automated multiverse analysis for fMRI
     a. Function parameters must follow this naming convention:
       i. For variables only affecting the function and not internal nodes -> all lower case, one word (no underscore)
       ii. For nodes inside the function -> nodename_nipypeinterfaceparametername (similar to the above section, nipypeinterfaceparametername is copied exactly from nipype including underscores)
-    b. To enable dynamic parameter assignment, there must be a linebreak before the workflow is run inside a function (i.e. randomline \n\n workflow.run())
+    b. To enable dynamic parameter assignment, there must be a linebreak before the workflow is run inside a function (i.e. randomline \n\n workflow.run() or randomline \n\n node.run())
+      i. If assigning the output of node.run() to a variable, the variable name cannot have an underscore
   2. Entries in json file starting with ~construct~ (i.e. ~construct~Finfo) indicate a dictionary will be constructed from the provided information, and passed to the function (i.e. Finfo) in the format of dictionaryname_parametername
   3. Entries starting with ! (i.e. !correction) indicate that the value will be copied from another parameter as defined in default_links.json
     a. node_to_add and node_to_copy indicate the name of the parameter to add, and the node the values will be copied from, respectively
@@ -38,6 +42,7 @@ Software for automated multiverse analysis for fMRI
 
 # Resource Allocation
  - On compute canada ~4 days for 50 subjects x 200 pipelines with 200 CPUs, 6gb RAM per CPU
+ - Potential issue: There is a file cap on compute canada of 1000k (Graham), which may result in workflow crashing (likely need to get this extended)
  - Generates a lot of data, peaking at ~0.83GB per subject per pipeline
    a. Running with debug set to false will delete files once they are no longer needed by the workflow
      i. Saves a LOT of space, but if the analysis fails, it cannot be rerun from where it failed, and will restart from the beginning (i.e. progress is lost)

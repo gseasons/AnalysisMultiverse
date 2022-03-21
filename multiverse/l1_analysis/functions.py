@@ -42,7 +42,7 @@ def warp(in_file, ref, warp):
     from nipype.interfaces.fsl import ApplyWarp
     import os
     base_dir = os.getcwd()
-    warped = Node(ApplyWarp(ref_file=ref, field_file=warp), name='warped', base_dir=base_dir)
+    warped = Node(ApplyWarp(ref_file=ref, field_file=warp, interp='trilinear'), name='warped', base_dir=base_dir)
     warped.inputs.in_file = in_file
     return warped.run().outputs.out_file
 
