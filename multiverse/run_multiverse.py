@@ -26,9 +26,9 @@ import shutil
 from nipype.utils.profiler import log_nodes_cb
 #TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
 
-exp_dir = '/Volumes/NewVolume/a'#'/scratch'
+exp_dir = '/scratch'
 working_dir = 'working_dir'
-data_dir = '/Volumes/NewVolume/super_agers'#'/data'
+data_dir = '/data'
 out_dir = exp_dir + '/processed'
 mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
 dir = os.path.dirname(os.path.abspath(__file__))
@@ -76,18 +76,6 @@ with open(opj(dir, 'configuration', 'default_links.json')) as f:
 links = fix_links(prelim_links)
 
 conf.set("execution", "hash_method", "content")
-#conf.set("execution", "remove_node_directories", "false")#TRUE USUALLY
-
-
-# =============================================================================
-# conf.enable_resource_monitor()
-# import logging
-# callback_log_path = '/scratch/run_stats.log'
-# logging.basicConfig(filename=callback_log_path, level=logging.DEBUG)
-# logger = logging.getLogger('callback')
-# handler = logging.FileHandler(callback_log_path)
-# logger.addHandler(handler)
-# =============================================================================
 
 if not config['debug']:
     conf.set("execution", "remove_node_directories", "true")
@@ -160,7 +148,6 @@ def on_pop_gen(ga):
     for task in tasks:
         subjects = layout.get_subjects(task=task)
         subjects.sort()
-        subjects = subjects[0:2]
         types = layout.get_datatypes()
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
@@ -177,7 +164,7 @@ def on_pop_gen(ga):
         #PROBABLY CHANGE SO THAT BATCH ONLY COMES INTO PLAY IF RUNNING MULTIPROC OR SLURM
         gb_per_pipe = len(subjects) * (len(sessions) + 1) * (len(runs) + 1) * 0.83
         
-        batch_size = 50#pop_.shape[0] #config['batches']
+        batch_size = config['batches']
         iterations = math.ceil(pop_.shape[0] / batch_size)
         
         if (config['storage'] / gb_per_pipe) < pop_.shape[0]:
@@ -274,11 +261,9 @@ def on_pop_gen(ga):
                     
                     plugin_args = {'task': task, 'batch': batch}
     
-                    if False:#config['processing'] == 'SLURM':
+                    if config['processing'] == 'SLURM':
                         config['processing'] = 'IPython'
                         plugin_args['profile'] = profile
-                    
-                    config['processing'] = 'MultiProc'
                         
                     if checkpoints and batch == last_batch:
                         pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
@@ -291,10 +276,6 @@ def on_pop_gen(ga):
                     organized = organize(task, out_frame)
                     
                     if not config['debug']:
-# =============================================================================
-#                         if os.path.exists('/scratch/processed/reproducibility/checkpoints'):
-#                             os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
-# =============================================================================
                         shutil.rmtree('/scratch/' + working_dir)
                 
     if 'num_generations' not in config:
@@ -303,22 +284,9 @@ def on_pop_gen(ga):
         
         #TODO: DATA ANALYSIS
         sys.exit()#return "stop"
-        #RUN PIPELINES IN BATCHES BASED ON NUMBER OF SUBJECTS/NUMBER OF PIPELINES -> max of ~0.83 GB PER SUBJECT PER PIPELINE
-        #GA NOT SELECTED -> 1 generation, number of pipelines -> run in batches
-        #ALLOW USER TO SPECIFY MAXIMUM OUTPUT FOLDER SIZE
-        #TEST!        
         
-        #TODO: TEST THAT DELETE FILES WHEN DONE WORKS WITH IPYTHON
-        #      BENCHMARK WORKFLOW -> ~resources for each node
-        #      REPLACE NIPYPE FILES WITH CUSTOM -> either in build or via bind? YES VIA BIND
-        #      TRY RUNNING SMALL SET ON COMPUTE CANADA TOP TO BOTTOM
-        #      MAKE SURE DOCKER IN BACKGROUND WORKS
-        #      COMPILE SOURCES INTO ZOTERO
-        #      DO RESOURCE PROFILING ON COMPUTE CANADA TO SEE WHY CPU EFFICIENCY SO LOW
+        #TODO: MAKE SURE DOCKER IN BACKGROUND WORKS
         
-    #*#*#FIX PATHS -> EACH IPYTHON ENGINE NEEDS TO BE LAUNCHED WITH THE SAME PATHS -> CURRENTLY GETTING SOME WHICH DON'T KNOW WHERE TO FIND USER DEFINED PACKAGES
-        
-        #TRY RUNNING ON COMPUTE CANADA
 
 def main():
     if 'num_generations' in config:
@@ -334,7 +302,7 @@ def main():
         parent_selection_type = 'random'
         crossover_type = 'single_point'
         mutation_type = 'random'
-        sol_per_pop = 200#config['pipelines']
+        sol_per_pop = config['pipelines']
     
     gene_space = []
     dummy = 0

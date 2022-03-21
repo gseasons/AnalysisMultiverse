@@ -50,7 +50,7 @@ def parse(start):
                 run_now = config.run_now
                 process_mode = config.configure['processing']
                 configure = config.configure
-        #MAKE SO THAT USING ARGS.RERUN WILL READ CONFIG FILE, AND SAVE WHATEVER TRUE OR FALSE WITH IT
+        
         if args.config:
             config = MultiverseConfig(args.rerun, args.data, args.out)
             run_now = config.run_now
@@ -107,18 +107,13 @@ def main():
         else:
             if config['account'] == 'def-':
                 config['account'] = ''
-            #config['ntasks'] = 24
-            #config['account'] = 'def-emazerol'
-            #config['time'] = '0-05:00'
-            #config['mem'] = '40000'
-            #REQUEST FULL NODES INSTEAD OF BUNCH OF CPUs
-            #subprocess.call(['sbatch', '--ntasks={0}'.format(config['ntasks']), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem-per-cpu={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
+            
             if config['processing'] == 'SLURM' and 'num_generations' not in config:
                 config['nodes'] = '1'
                 config['ntasks'] = config['cpu_node']
                 
                 split_ = re.split('-|:', config['time'])
-                print(split_)
+                
                 time_s = 0
                 for k, sp in enumerate(split_):
                     if not k:
