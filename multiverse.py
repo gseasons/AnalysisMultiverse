@@ -133,7 +133,7 @@ def main():
                 
                 config['time'] =  str(days) + '-' + str(hours) + ':' + str(minutes) + ':' + str(seconds)
                 config['mem'] = np.ceil(float(config['mem']) * int(config['cpu_node'])).astype(int).astype(str)
-                config['batch'] = np.ceil(int(config['cpu_node']) / 4).astype(int)
+                config['batches'] = np.ceil(int(config['cpu_node']) / 4).astype(int)
                 
                 subprocess.call(['{0}/configuration/intermediate.sh'.format(code_dir), args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']])
             else:
