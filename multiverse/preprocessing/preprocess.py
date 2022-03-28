@@ -29,13 +29,13 @@ class preprocess(spatial_normalization):
         
         intermediates = ['smoothed', 'segmentations', 'warp', 'warp_field', 'brain', 'outliers', 'plots', 'invwarp', 'coregmat']
         
-        self.preprocessing(preprocess, func_dic, subjects)
+        brain_extracted = self.preprocessing(preprocess, func_dic, subjects)
         self.get_warps(preprocess)
         
         preprocess.connect([(inputnode, preprocess.get_node('Fregistration'), [('T1w', 'T1w')]),
                                                                               #('mask', 'mask')]),
                             #(inputnode, preprocess.get_node('bet'), [('T1w', 'inputnode.in_files')]),
-                            (inputnode, preprocess.get_node('bet'), [('T1w', 'T1w')]),
+                            #(inputnode, preprocess.get_node('bet'), [('T1w', 'T1w')]),
                             (inputnode, preprocess.get_node('slicetimer'), [('TR', 'time_repetition')]),
                             (inputnode, preprocess.get_node('extract'), [('bold', 'in_file')]),
                             (inputnode, preprocess.get_node('warp'), [('mask', 'ref_file')]),
@@ -51,6 +51,11 @@ class preprocess(spatial_normalization):
                             (preprocess.get_node('bet_strip'), preprocess.get_node('dilatebrain'), [('out_file', 'in_file')]),
                             (preprocess.get_node('warp'), preprocess.get_node('Fmni'), [('field_file', 'warp')]),
                             ])
+        
+        if brain_extracted:
+            preprocess.connect(inputnode, 'T1w', preprocess.get_node('bet'), 'T1w')
+        else:
+            preprocess.connect(inputnode, 'T1w', preprocess.get_node('bet'), 'inputnode.in_files')
         
         outnode = Node(IdentityInterface(fields=['smoothed', 'segmentations', 'warp_file', 'brain', 'brainmask', 'outliers', 'unsmoothed', 'invwarp']), name='outnode')
         
@@ -97,7 +102,7 @@ class preprocess(spatial_normalization):
     
     def preprocessing(self, flow, func_dic, subjects):
         from preprocessing.functions import function_str, decision
-        self.coregistration(flow, func_dic, subjects)
+        brain_extracted = self.coregistration(flow, func_dic, subjects)
         
         extract = Node(ExtractROI(t_size=-1, output_type='NIFTI_GZ'), name='extract', n_procs=3, mem_gb=0.5)
         mcflirt = Node(MCFLIRT(save_plots=True, output_type='NIFTI_GZ'), name='mcflirt', n_procs=2, mem_gb=0.7)
@@ -158,18 +163,22 @@ class preprocess(spatial_normalization):
                       (fillmask, Fsmooth, [('out_file', 'mask')]),
                       ])
         
+        return brain_extracted
+        
     def coregistration(self, flow, func_dic, subjects):
         from preprocessing.functions import function_str, strip_container
         from preprocessing.workflows import check4brains, betwrite
         
         bet = Node(Function(input_names=['data_dir', 'T1w'], output_names='out_file', function=check4brains), name='bet')
         bet.inputs.data_dir = self.data_dir
+        brain_extracted = True
         
         for sub in subjects:
             masked = glob.glob(self.data_dir + '/brain_extracted/_subject_{sID}/*masked.nii.gz'.format(sID=sub))
             if not masked:
                 from niworkflows.anat.ants import init_brain_extraction_wf
                 bet = init_brain_extraction_wf(name='bet', omp_nthreads=2, mem_gb=3)
+                brain_extracted = False
                 break
         
         bet_strip = Node(Function(input_names='in_file', output_names='out_file', function=strip_container), name='bet_strip')
@@ -208,3 +217,5 @@ class preprocess(spatial_normalization):
                       (Fregistration, Fmni, [('out_mat', 'out_mat')]),
                       (Fmni, boldmask, [('brainmask', 'inputnode.pre_mask')]),
                       ])
+        
+        return brain_extracted
