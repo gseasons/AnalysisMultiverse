@@ -155,6 +155,8 @@ class preprocess(spatial_normalization):
                       (flow.get_node('boldmask'), fillmask, [('outputnode.skull_stripped_file', 'in_file')]),
                       (flow.get_node('Fregistration'), art, [('warped', 'realigned_files')]),
                       (flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
+                      #MAYBE REPLACE THIS WITH OUTPUT OF FILLMASK
+                      #(flow.get_node('fillmask'), Fregress, [('out_file', 'mask')]),
                       (flow.get_node('Fmni'), Fregress, [('brainmask', 'mask')]),
                       (flow.get_node('Fmni'), Fregress, [('segmentations', 'segmentations')]),
                       #(art, Fregress, [('outlier_files', 'outliers')]),

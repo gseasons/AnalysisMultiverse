@@ -40,6 +40,13 @@ Software for automated multiverse analysis for fMRI
       i. on_off is the node which controls mutual exclusivity, switch indicates the value of on_off that is mutually exclusive with node_to_edit
   4. Naming conventions MUST be followed as they are what enable the dynamic creation of custom pipelines which share data as long as possible, and don't force an analysis of all permutations of multiverse options
 
+# Adding Additional FEAT Options
+ - To add more options to the first level FEAT analysis, the template file: nipype/interfaces/fsl/model_templates/feat_ev_none.tcl can be edited
+   a. This will also require editing versatile.py lines 784 to 808 so that values can be added to the template file
+     i. In addition, SpecifyModelVersatile will need to be altered so that the produced dictionary will include the altered parameters added to the template file
+     ii. Then, the workflow "info" for level1 will need to be updated so that the new parameters will be added to SpecifyModelVersatile
+     iii. Finally, changes to the default.json file will need to be made to add new parameters
+
 # Resource Allocation
  - On compute canada ~4 days for 50 subjects x 200 pipelines with 200 CPUs, 6gb RAM per CPU
  - Potential issue: There is a file cap on compute canada of 1000k (Graham), which may result in workflow crashing (likely need to get this extended)

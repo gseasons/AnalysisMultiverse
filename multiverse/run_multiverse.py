@@ -76,6 +76,7 @@ with open(opj(dir, 'configuration', 'default_links.json')) as f:
 links = fix_links(prelim_links)
 
 conf.set("execution", "hash_method", "content")
+conf.set("execution", "crashfile_format", "txt")
 
 if not config['debug']:
     conf.set("execution", "remove_node_directories", "true")
@@ -178,6 +179,8 @@ def on_pop_gen(ga):
             batch_size = batch_size_
             iterations = iterations_
         
+        existing_checkpoints = glob.glob(out_dir + '/checkpoints_' + task + '_batch_*_done')
+        
         for batch in range(iterations):
             if checkpoints:
                 workflows = glob.glob('/scratch/processed/reproducibility/' + task + '_workflow*')
@@ -202,6 +205,11 @@ def on_pop_gen(ga):
             else:
                 already_run = set()
             master, expand_inputs, unique_pipelines = generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle, pipeline, frame)
+            
+            if existing_checkpoints and not config['rerun']:
+                existing_checkpoints.sort(key=lambda x: int(re.search('batch_([0-9]+)', x).group(1)))
+                last_batch = int(re.search('batch_([0-9]+)', existing_checkpoints[-1]).group(1)) + 1
+                batch += last_batch
             
             un = unique_pipelines.shape[0]
             test_unique = unique_pipelines.astype(str).drop_duplicates(subset=unique_pipelines.columns.difference(['R', 'P', 'Score']))
@@ -245,12 +253,20 @@ def on_pop_gen(ga):
             
             if 'anat' in types and 'func' in types and to_run:
                 if config['processing'] == 'SLURM' and 'num_generations' not in config:
+                    save_dir = out_dir + '/checkpoints_' + task + '_batch_' + str(batch)
+                    config.set("execution", "crashdump_dir", save_dir)
+                    
                     pipelines = analysis(exp_dir, task+'_'+working_dir+'_'+str(batch), data_dir, out_dir)
                     pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)
                     pipelines.inputs.inputnode.mask = mask
                     pipelines.inputs.inputnode.task = task
                     
-                    save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
+                    if os.path.exists(save_dir + '_done') and config['rerun']:
+                        wf_path = save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
+                        shutil.rmtree(wf_path)
+                    else:
+                        save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
+                        
                     if batch == (iterations-1):
                         sys.exit()
                 else:
@@ -269,13 +285,17 @@ def on_pop_gen(ga):
                         pipelines = load('reproducibility', task + '_workflow_' + str(batch) + '.pkl')
                     else:
                         save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
-                        
+                    
+                    save_dir = out_dir + '/checkpoints_' + task + '_batch_' + str(batch)
+                    config.set("execution", "crashdump_dir", save_dir)
+                    
                     pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
                 
                     #USE IN FINAL DATA ANALYSIS
                     organized = organize(task, out_frame)
                     
-                    if not config['debug']:
+                    if not config['debug'] and not glob.glob(save_dir + '/crash-*'):
+                        os.rename(save_dir, save_dir + '_done')
                         shutil.rmtree('/scratch/' + working_dir)
                 
     if 'num_generations' not in config:

@@ -10,7 +10,7 @@ def write_out(base_dir, pipeline_st, task):
     from nipype.interfaces import DataSink
     from nipype import Node
     import re, os, glob
-    sink = Node(DataSink(base_directory=base_dir, parameterization=True), name='sink')
+    sink = DataSink(base_directory=base_dir, parameterization=True)
     folder_name = task
     test_str = vars()[outputs[0]]
     if isinstance(test_str, list):

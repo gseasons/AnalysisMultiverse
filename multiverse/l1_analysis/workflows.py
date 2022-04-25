@@ -14,11 +14,16 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
     import re, os
     import numpy as np
     from l1_analysis.functions import data_driven, warp, parse_xml
+    import warnings
     
     model = Node(SpecifyModelVersatile(input_units='secs', parameter_source='FSL'), name='model')
     model.inputs.time_repetition = TR
     model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
-    model.inputs.outlier_files = outliers
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        if np.loadtxt(outliers).size:
+            model.inputs.outlier_files = outliers
     
     if vars().get('LP', False):
         lpfilter = TemporalFilter(in_file=smoothed)

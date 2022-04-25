@@ -782,7 +782,6 @@ class Level1DesignVersatile(BaseInterface):
                         ev_txt += ev_template.substitute(ev_parameters)
                     except:
                         evinfo = [[j] for j in cond["val"]]
-                        
                         ev_parameters["cond_file"] = evfname
                         ev_parameters["ev_num"] = num_evs[0]
                         ev_parameters["ev_name"] = name
@@ -801,11 +800,12 @@ class Level1DesignVersatile(BaseInterface):
                         ev_parameters["temporalderiv"] = int(
                             bool(ev_parameters.get("derivs", False))
                         )
+                        #Don't convolve if resting state
+                        ev_txt += ev_none.substitute(ev_parameters)
                         if ev_parameters["temporalderiv"]:
                             evname.append(name + "TD")
                             num_evs[1] += 1
-                        #Don't convolve if resting state
-                        ev_txt += ev_none.substitute(ev_parameters)
+                            ev_txt.replace("set fmri(deriv_yn1) 0", "set fmri(deriv_yn1) 1")
                         #ev_txt += ev_template.substitute(ev_parameters)
 # =============================================================================
 #                         ev_txt += ev_none.substitute(

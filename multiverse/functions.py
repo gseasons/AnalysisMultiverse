@@ -651,7 +651,7 @@ def organize(task, out_frame):
                       {parameters: {parameters}}
                       }
     """
-    processed = {'pipeline': {}}
+    processed = {'pipeline': {}, 'constants': {}}
     pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
     dat_frame = out_frame
     
@@ -677,6 +677,7 @@ def organize(task, out_frame):
         for i, column in enumerate(dat_frame):
             col = pipe_dat[column]
             if (comp[i] == dat_frame[column]).all():
+                processed['constants'][column] = col
                 continue
             
             if 'parameters' not in processed['pipeline'][pipeline]:
@@ -684,7 +685,15 @@ def organize(task, out_frame):
             
             if isinstance(col, dict):
                 for key in col:
-                    processed['pipeline'][pipeline]['parameters'][key] = col[key]
+                    if task == 'rest':
+                        if 'gamma' in col[key] or 'dgamma' in col[key]:
+                            processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]['derivs']
+                        elif 'custom' in col[key]:
+                            processed['pipeline'][pipeline]['parameters']['derivs'] = False
+                        else:
+                            processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]
+                    else:
+                        processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]
             else:
                 processed['pipeline'][pipeline]['parameters'][column] = col
     

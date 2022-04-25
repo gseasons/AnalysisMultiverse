@@ -13,10 +13,11 @@ import os
 import shutil
 from time import sleep, time
 from traceback import format_exception
+import multiprocessing
 
 import numpy as np
 from collections.abc import Iterable
-from collections import Counter
+#from collections import Counter
 import pickle, re
 
 from ... import logging
@@ -179,35 +180,46 @@ class DistributedPluginBase(PluginBase):
             self.__dict__.update(saved_state)
     
     def _save_state(self, stamp):
-        temp = self.__dict__.copy()
-        temp['proc_done'] = np.array(self.__dict__['proc_done'])
-        temp['proc_pending'] = np.array(self.__dict__['proc_pending'])
-        if 'pool' in temp:
-            temp.pop('pool')
-            temp.pop('processors')
-            temp.pop('memory_gb')
-            _task_obj = temp['_task_obj']
-            temp['_task_obj'] = _task_obj.fromkeys(_task_obj, {})
-        elif 'iparallel' in temp:
-            temp.pop('client_args')
-            temp.pop('iparallel')
-            temp.pop('taskclient')
-            temp.pop('taskmap')
-        
-        task = temp['plugin_args']['task']
-        batch = temp['plugin_args']['batch']
-        
-        temp.pop('plugin_args')    
-        temp.pop('timestamp')
-        
-        file_name = '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_' + str(int(stamp)) + '.pkl'
-        
-        if not os.path.exists('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)):
-            os.makedirs('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
-        
-        with open(file_name, 'wb') as f:
-            pickle.dump(temp, f)
-
+        try:
+            if 'pool' in self.__dict__:
+                m = multiprocessing.Manager()
+                lock = m.Lock()
+                with lock:
+                    temp = self.__dict__.copy()
+                    temp['proc_done'] = np.array(temp['proc_done'])
+                    temp['proc_pending'] = np.array(temp['proc_pending'])
+                    
+                temp.pop('pool')
+                temp.pop('processors')
+                temp.pop('memory_gb')
+                _task_obj = temp['_task_obj']
+                temp['_task_obj'] = _task_obj.fromkeys(_task_obj, {})
+            elif 'iparallel' in self.__dict__:
+                temp = self.__dict__.copy()
+                temp['proc_done'] = np.array(temp['proc_done'])
+                temp['proc_pending'] = np.array(temp['proc_pending'])
+                temp.pop('client_args')
+                temp.pop('iparallel')
+                temp.pop('taskclient')
+                temp.pop('taskmap')
+            
+            task = temp['plugin_args']['task']
+            batch = temp['plugin_args']['batch']
+            
+            temp.pop('plugin_args')    
+            temp.pop('timestamp')
+            
+            file_name = '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_' + str(int(stamp)) + '.pkl'
+            if not os.path.exists('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)):
+                os.makedirs('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
+            with open(file_name, 'wb') as f:
+                pickle.dump(temp, f)
+            
+            return
+        except Exception as e:
+            print("Initial save attempt failed - {0}".format(e))
+            return
+    
     def run(self, graph, config, updatehash=False):
         """
         Executes a pre-defined pipeline using distributed approaches
@@ -224,10 +236,13 @@ class DistributedPluginBase(PluginBase):
         self.mapnodesubids = {}
         # setup polling - TODO: change to threaded model
         notrun = []
+        errors = []
         self.hours_elapsed = 0
+        
         if str2bool(self._config["execution"]["remove_node_directories"]):
             self._load_state()
-        
+        self.STOP = False
+
         old_progress_stats = None
         old_presub_stats = None
         while not np.all(self.proc_done) or np.any(self.proc_pending):
@@ -243,6 +258,13 @@ class DistributedPluginBase(PluginBase):
                 len(self.pending_tasks),
                 np.sum(~self.proc_done & ~self.proc_pending),
             )
+            
+            logger.debug(
+                    "Progress: %d jobs, %d/%d/%d "
+                    "(done/running/ready), %d/%d "
+                    "(pending_tasks/waiting).",
+                    *progress_stats
+                )
             
             display_stats = progress_stats != old_progress_stats
             if display_stats:
@@ -260,14 +282,25 @@ class DistributedPluginBase(PluginBase):
                 taskid, jobid = self.pending_tasks.pop()
                 try:
                     result = self._get_result(taskid)
-                except Exception:
+                except Exception as exc:
+                    if not self.STOP:
+                        self._save_state(self.hours_elapsed + 1)
+                    
+                    self.STOP = True
                     notrun.append(self._clean_queue(jobid, graph))
+                    errors.append(exc)
                 else:
                     if result:
                         if result["traceback"]:
+                            if not self.STOP:
+                                self._save_state(self.hours_elapsed + 1)
+                            
+                            self.STOP = True
+                            
                             notrun.append(
                                 self._clean_queue(jobid, graph, result=result)
                             )
+                            errors.append("".join(result["traceback"]))
                         else:
                             self._task_finished_cb(jobid)
                             self._remove_node_dirs()
@@ -275,13 +308,7 @@ class DistributedPluginBase(PluginBase):
                     else:
                         assert self.proc_done[jobid] and self.proc_pending[jobid]
                         toappend.insert(0, (taskid, jobid))
-                
-                num_jobs = len(self.pending_tasks)
-                if num_jobs < self.max_jobs and (time() - loop_start) > poll_sleep_secs:
-                    submitted_ = self._send_procs_to_workers(updatehash=updatehash, graph=graph)
-                    if submitted_:
-                        loop_start = time()
-                    
+
             if toappend:
                 self.pending_tasks.extend(toappend)
 
@@ -291,26 +318,32 @@ class DistributedPluginBase(PluginBase):
             if display_stats:
                 logger.debug("Tasks currently running: %d. Pending: %d.", *presub_stats)
                 old_presub_stats = presub_stats
-                
-            if num_jobs < self.max_jobs and (time() - loop_start) > poll_sleep_secs:
-                submitted_ = self._send_procs_to_workers(updatehash=updatehash, graph=graph)
-            elif num_jobs > self.max_jobs:
-                submitted_ = False
-            else:
-                submitted_ = False
-                sleep_til = loop_start + poll_sleep_secs
-                sleep(max(0, sleep_til - time()))
-                
-                
-            if num_jobs < self.max_jobs and not submitted_:
+            if num_jobs < self.max_jobs:
                 self._send_procs_to_workers(updatehash=updatehash, graph=graph)
             elif display_stats:
                 logger.debug("Not submitting (max jobs reached)")
+
+            sleep_til = loop_start + poll_sleep_secs
+            sleep(max(0, sleep_til - time()))
             
         self._remove_node_dirs()
         report_nodes_not_run(notrun)
         # close any open resources
         self._postrun_check()
+        
+        if errors:
+            # If one or more nodes failed, re-rise first of them
+            error, cause = errors[0], None
+            if isinstance(error, str):
+                error = RuntimeError(error)
+
+            if len(errors) > 1:
+                error, cause = (
+                    RuntimeError(f"{len(errors)} raised. Re-raising first."),
+                    error,
+                )
+
+            raise error from cause
 
     def _get_result(self, taskid):
         raise NotImplementedError
@@ -384,8 +417,8 @@ class DistributedPluginBase(PluginBase):
         """
         Sends jobs to workers
         """
-
         while not np.all(self.proc_done):
+            print('LOOP 4: SEND PROC TO WORKERS')
             num_jobs = len(self.pending_tasks)
             if np.isinf(self.max_jobs):
                 slots = None
@@ -451,12 +484,8 @@ class DistributedPluginBase(PluginBase):
                     logger.info(
                         "Finished submitting: %s ID: %d", self.procs[jobid], jobid
                     )
-                    submitted = True
             else:
-                submitted = False
                 break
-            
-        return submitted
 
     def _local_hash_check(self, jobid, graph):
         if not str2bool(self.procs[jobid].config["execution"]["local_hash_check"]):
@@ -531,12 +560,6 @@ class DistributedPluginBase(PluginBase):
         rowview[rowview.nonzero()] = 0
         if jobid not in self.mapnodesubids:
             self.refidx[self.refidx[:, jobid].nonzero()[0], jobid] = 0
-        
-        if str2bool(self._config["execution"]["remove_node_directories"]):
-            if (time() - self.timestamp) / 3600 > 1:
-                self.hours_elapsed += 1
-                self._save_state(self.hours_elapsed)
-                self.timestamp = time()
 
     def _generate_dependency_list(self, graph):
         """Generates a dependency list for a list of graphs."""
@@ -636,10 +659,9 @@ class DistributedPluginBase(PluginBase):
 
     def _remove_node_dirs(self):
         """Removes directories whose outputs have already been used up"""
-        if str2bool(self._config["execution"]["remove_node_directories"]):
+        if str2bool(self._config["execution"]["remove_node_directories"]) and not self.STOP:
             indices = np.nonzero((self.refidx.sum(axis=1) == 0).__array__())[0]
             indices_check = np.setdiff1d(list(set(self.delete)), indices)
-            indices_count = Counter(self.delete)
             indices = np.setdiff1d(indices, list(set(self.delete)))
             for idx in indices:
                 if idx in self.mapnodesubids:
@@ -661,18 +683,9 @@ class DistributedPluginBase(PluginBase):
                                 continue
                             
                             if i in self.delete:
-                                self.delete.remove(i)
-                                if indices_count[i]:
-                                    indices_count[i] -= 1
-                                    continue
-                            #MIGHT JUST REVERT TO DELETING EVERYTHING FROM SET
+                                self.delete = list(np.setdiff1d(self.delete, i))
                             if vars(self).get('_'+str(i), '') != '':
-                                #self.delete = list(np.setdiff1d(self.delete, vars(self)['_'+str(i)]))
-                                for i_ in vars(self).get('_'+str(i)):
-                                    if i_ in self.delete:
-                                        self.delete.remove(i_)
-                                        if indices_count[i_]:
-                                            indices_count[i_] -= 1
+                                self.delete = list(np.setdiff1d(self.delete, vars(self)['_'+str(i)]))
                                 del vars(self)['_'+str(i)]
                                 
                             self.refidx[i, i] = -1
@@ -685,6 +698,11 @@ class DistributedPluginBase(PluginBase):
                                 % (self.procs[i]._id, outdir)
                             )
                             shutil.rmtree(outdir)
+                            
+            if (time() - self.timestamp) / 3600 > 1:
+                self.hours_elapsed += 1
+                self._save_state(self.hours_elapsed)
+                self.timestamp = time()
                             
 
 class SGELikeBatchManagerBase(DistributedPluginBase):

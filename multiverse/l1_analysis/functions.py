@@ -10,6 +10,23 @@ from nipype.utils.functions import getsource
 from workflows import write_out
 import re
 
+def no_tsplot(design):
+    if isinstance(design, str):
+        design_lst = [design]
+    else:
+        design_lst = design
+        
+    for des in design_lst:
+        with open(des, 'r') as f:
+            data = f.read()
+            
+        data = data.replace('set fmri(tsplot_yn) 1', 'set fmri(tsplot_yn) 0')
+        
+        with open(des, 'w') as f:
+            f.write(data)
+        
+    return design
+
 def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     """Implements ReHo calculation"""
     from nipype import Node

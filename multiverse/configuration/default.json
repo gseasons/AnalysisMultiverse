@@ -387,7 +387,7 @@
             "params": [
                 {
                     "on_off": "off",
-                    "alias": "Basis Functions",
+                    "alias": "Basis Functions (for resting state, convolution will not occur but derivs: true will add a temporal derivative)",
                     "name": "bases",
                     "value_map": [{"gamma": {"derivs": true}}, 
                                   {"gamma": {"derivs": false}},
@@ -395,7 +395,7 @@
                                   {"dgamma": {"derivs": false}},
                                   {"custom": {"bfcustompath": "{FSLDIR}/etc/default_flobs.flobs"}}
                                   ],
-                    "default": 0
+                    "default": 1
                 },
                 {
                     "on_off": "off",

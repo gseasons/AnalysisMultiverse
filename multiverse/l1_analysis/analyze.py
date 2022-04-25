@@ -87,7 +87,7 @@ class level1(spatial_normalization):
         
         
     def l1(self, flow, func_dic):
-        from l1_analysis.functions import function_str, correct_task_timing, contrasts
+        from l1_analysis.functions import function_str, correct_task_timing, contrasts, no_tsplot
         networks = Node(IdentityInterface(fields=['network']), name='networks')
         networks.iterables = ('network', range(self.networks))
         
@@ -110,12 +110,12 @@ class level1(spatial_normalization):
         
         l1d = Node(Level1DesignVersatile(), name='l1d')
         feat = Node(FEAT(), name='feat', n_procs=5, mem_gb=5)
-        
+        #MAYBE TRY AND FIX BEHAVIOUR WHERE IT PLUGINS_BASE DELETES EVERYTHING IF NODE FAILS -> BAD FOR RELOADING CHECKPOINTS, ETC.
         flow.connect([(networks, Finfo, [('network', 'network')]),
                       (Finfo, correction, [('session_info', 'session_info')]),
                       (correction, contrasts, [('session_info', 'session_info')]),
                       (correction, l1d, [('session_info', 'session_info')]),
                       (contrasts, l1d, [('contrasts', 'contrasts')]),
-                      (l1d, feat, [('fsf_files', 'fsf_file')]),
+                      (l1d, feat, [(('fsf_files', no_tsplot), 'fsf_file')]),
                       ])
 

@@ -5,10 +5,12 @@ Created on Wed Aug 11 11:48:57 2021
 
 @author: grahamseasons
 """
-from niworkflows.anat.ants import init_brain_extraction_wf
-from bids.layout import BIDSLayout
-from nipype import IdentityInterface, Node, DataSink
-from nipype import config, Workflow, Node, IdentityInterface
+# =============================================================================
+# from niworkflows.anat.ants import init_brain_extraction_wf
+# from bids.layout import BIDSLayout
+# from nipype import IdentityInterface, Node, DataSink
+# from nipype import config, Workflow, Node, IdentityInterface
+# =============================================================================
 #config.set("execution", "remove_node_directories", "true")
 # =============================================================================
 # global _10, _67, _3
@@ -33,6 +35,224 @@ from nipype import config, Workflow, Node, IdentityInterface
 # while egg:
 #     egg, lst, searched = _graph_expansion(lst, searched)
 # =============================================================================
+from nipype.interfaces.fsl import FEAT
+from versatile import Level1DesignVersatile
+session_info = [{'cond': [{'name': 'restCGpd_reho',
+    'val': [523.9141706,
+     521.3825046,
+     518.7441355,
+     525.9944038,
+     523.3702974,
+     520.7135899,
+     519.4899499,
+     518.2256872,
+     517.7056775,
+     515.8188535,
+     522.2146271,
+     522.6565685,
+     525.5559727,
+     524.8934914,
+     522.0269296,
+     518.484716,
+     522.7029589,
+     522.1850718,
+     519.8519039,
+     523.4304856,
+     524.4806235,
+     520.2526363,
+     522.7694948,
+     523.3149584,
+     519.0598643,
+     523.4289151,
+     519.5888904,
+     520.0456045,
+     525.689923,
+     520.785799,
+     522.0351376,
+     524.4935836,
+     520.5622298,
+     519.4173424,
+     523.8086371,
+     521.1135821,
+     519.9121561,
+     522.0884892,
+     523.636803,
+     525.9984949,
+     523.4525591,
+     524.8180157,
+     521.7333582,
+     518.6903152,
+     520.1154243,
+     524.2619541,
+     520.1227812,
+     517.6142647,
+     524.1435449,
+     520.4970097,
+     520.1293785,
+     526.633666,
+     523.0132243,
+     526.4592304,
+     523.6706582,
+     522.9001497,
+     518.8142817,
+     523.1804249,
+     517.0388255,
+     522.1317359,
+     525.8925004,
+     520.2672384,
+     522.939901,
+     518.1829668,
+     519.7445916,
+     519.224634,
+     523.9882617,
+     518.3163648,
+     520.9311208,
+     524.6851043,
+     525.9238771,
+     522.5382857,
+     516.5439475,
+     521.0770221,
+     520.559357,
+     524.4244076,
+     528.4022862,
+     526.5289325,
+     522.9554069,
+     527.0080792,
+     518.8766764,
+     515.3001698,
+     524.0125484,
+     523.4825032,
+     517.6736755,
+     518.3265113,
+     517.623657,
+     518.7528975,
+     524.1479554,
+     522.9472001,
+     521.2610465,
+     524.8822898,
+     521.1154723,
+     518.5077114,
+     522.0533653,
+     525.8718295,
+     522.3365774,
+     525.0065076,
+     521.8518968,
+     524.5601417,
+     527.3279346,
+     523.4879238,
+     524.617537,
+     521.9262307,
+     517.4693295,
+     520.2127537,
+     524.1173623,
+     521.8934934,
+     522.8781834,
+     526.0102196,
+     525.6829649,
+     525.5845405,
+     519.498632,
+     511.8530647,
+     520.1746305,
+     524.7334257,
+     521.038893,
+     524.9128171,
+     518.3703076,
+     516.342663,
+     524.4989133,
+     524.7674978,
+     523.4784265,
+     526.083682,
+     528.6507975,
+     520.8194131,
+     522.2880912,
+     524.5038042,
+     519.671753,
+     519.2311835,
+     522.1095102,
+     520.5004721,
+     522.5628555,
+     527.9761996,
+     525.0278007,
+     521.8146465,
+     518.4088504,
+     520.0479133,
+     519.7069576,
+     516.688006,
+     520.3941102,
+     521.4752565,
+     517.6309755,
+     522.544141,
+     519.1801841,
+     517.6254503,
+     522.7877449,
+     523.8813186,
+     520.4248663,
+     523.0229662,
+     524.5328056,
+     522.0535631,
+     523.2270856,
+     527.8424565,
+     524.3792384,
+     517.1946812,
+     523.7970232,
+     523.0045523,
+     515.9437406,
+     520.1420919,
+     521.0532451,
+     517.5264662,
+     523.6948907,
+     527.479161,
+     525.4161724,
+     525.8137277,
+     526.4819102,
+     527.5393392,
+     520.3307015,
+     522.2913372,
+     521.4854904,
+     515.5943045,
+     515.7915448,
+     519.6783481,
+     517.4832658,
+     522.386081,
+     521.55045,
+     518.8719472,
+     519.5202914,
+     529.2074178,
+     525.1318357,
+     522.481589,
+     523.1535013,
+     519.9243797,
+     518.7760827,
+     522.8406785,
+     524.3160866]}],
+  'hpf': 128.0,
+  'regress': [],
+  'scans': '/Volumes/NewVolume/docker_test2/working_dir/fmri/preprocess/_subject_002S6030/Fsmooth/smooth/smooth_su/sub-002S6030_task-rest_bold_roi_mcf_regressed_maths_smooth.nii.gz'}]
+A = Level1DesignVersatile(session_info=session_info, contrasts=[('restCGpd_reho', 'T', ['restCGpd_reho'], [1.0])], model_serial_correlations=True, bases={'gamma': {'derivs': True}}, interscan_interval=3)
+B = FEAT(fsf_file=A.run().outputs.fsf_files)
+C = B.run()
+lst = [1]
+searched = []
+_1 = [2,3,4,5,6]
+_2 = [3,4,5,6,7]
+_3 = [8]
+egg = True
+def _graph_expansion(lst, searched):
+        _1 = [2,3,4,5,6]
+        _2 = [3,4,5,6,7]
+        _3 = [8, 3, 7, 1]
+        lst_out = lst.copy()
+        for idx in lst:
+            if idx in searched:
+                continue
+            lst_out += vars().get('_'+str(idx), [])
+            searched.append(idx)
+            
+        return len(set(searched)) != len(set(lst_out)), lst_out, searched
+
+while egg:
+    egg, lst, searched = _graph_expansion(lst, searched)
+
 import math
 import numpy as np
 pop_ = np.zeros([202,8])
@@ -54,7 +274,6 @@ for batch in range(iterations):
     else:
         params = params_[:, batch*batch_size:]
         pop = pop_[batch*batch_size:,:]
-
 
 
 def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, outliers, segmentations, invwarp, network, rest, HP, warppostfeat, concatenate):

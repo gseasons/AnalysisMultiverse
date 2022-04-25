@@ -75,14 +75,20 @@ def main():
     
     if run_now:
         code_dir = os.path.join(dir, 'multiverse')
-        print(dir)
+        #IF TEMPLATE FLOW FAILS, UNCOMMENT LINES 82-84, AND COMMENT LINES 79-80
+# =============================================================================
+#         volumes = ['{code}:/multiverse/code'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
+#                    '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir)]
+# =============================================================================
         volumes = ['{code}:/multiverse/code'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
-                   '{work_dir}:/scratch'.format(work_dir=args.out), 'plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py']
+                   '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir),
+                   '{code}/templateflow:/home/multiverse/.cache/templateflow'.format(code=code_dir)]
         if process_mode != 'SLURM':
             try:
                 import docker
             except:
                 subprocess.call(['pip', 'install', 'docker'])
+                import docker
             client = docker.from_env()
             try:
                 print('Running Container')
