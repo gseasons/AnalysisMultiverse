@@ -12,7 +12,7 @@ import json, pickle
 import tkinter as tk
 from tkinter import ttk
 from functools import partial
-import numpy as np
+from math import ceil
 
 class AutoScrollbar(tk.Scrollbar):
     def set(self, lo, hi):
@@ -285,7 +285,7 @@ class MultiverseConfig():
         
         ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
         self.batches = ttk.Entry(self.slurm_frame)
-        self.batches.insert(4, str(np.ceil(int(self.pipelines.get())/4).astype(int)))
+        self.batches.insert(4, str(ceil(int(self.pipelines.get())/4).astype(int)))
         self.batches.grid(row=4, column=1)
         
         ttk.Label(self.slurm_frame, text='Memory required per CPU (GB):').grid(row=5)
@@ -307,8 +307,8 @@ class MultiverseConfig():
         
     def set_slurm(self, auto):
         node_request = int(self.cpus.get()) / int(self.nodes.get())
-        self.configure['nodes'] = str(np.ceil(node_request).astype(int))
-        self.configure['ntasks'] = str(np.ceil(node_request).astype(int) * int(self.nodes.get()))
+        self.configure['nodes'] = str(ceil(node_request).astype(int))
+        self.configure['ntasks'] = str(ceil(node_request).astype(int) * int(self.nodes.get()))
         self.configure['cpu_node'] = self.nodes.get()
         self.configure['batches'] = int(self.batches.get())
         self.configure['account'] = self.account.get()
