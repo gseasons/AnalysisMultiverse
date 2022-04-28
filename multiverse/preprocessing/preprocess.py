@@ -10,7 +10,7 @@ from nipype import Workflow, Node, IdentityInterface, Function, DataSink
 from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, FAST, UnaryMaths
 from nipype.algorithms.rapidart import ArtifactDetect
 import os, glob
-from preprocessing.functions import get_wm, get_sink
+from preprocessing.functions import get_wm, get_sink, mniMask, mniMaskpre
 #from niworkflows.anat.ants import init_brain_extraction_wf
 from niworkflows.func.util import init_enhance_and_skullstrip_bold_wf
 
@@ -39,11 +39,13 @@ class preprocess(spatial_normalization):
                             (inputnode, preprocess.get_node('slicetimer'), [('TR', 'time_repetition')]),
                             (inputnode, preprocess.get_node('extract'), [('bold', 'in_file')]),
                             (inputnode, preprocess.get_node('warp'), [('mask', 'ref_file')]),
-                            (inputnode, preprocess.get_node('prelim'), [('mask', 'reference')]),
-                            (inputnode, preprocess.get_node('dilateref'), [('mask', 'in_file')]),
+                            (inputnode, preprocess.get_node('prelim'), [(('mask', mniMaskpre), 'reference')]),
+                            (inputnode, preprocess.get_node('dilateref'), [(('mask', mniMask), 'in_file')]),
                             (inputnode, preprocess.get_node('Fmni'), [('mask', 'mniMask')]),
-                            (preprocess.get_node('bet_strip'), preprocess.get_node('warp'), [('out_file', 'in_file')]),
-                            (preprocess.get_node('bet_strip'), preprocess.get_node('invwarp'), [('out_file', 'brain')]),
+                            #(preprocess.get_node('bet_strip'), preprocess.get_node('warp'), [('out_file', 'in_file')]),
+                            (inputnode, preprocess.get_node('warp'), [('T1w', 'in_file')]),
+                            #(preprocess.get_node('bet_strip'), preprocess.get_node('invwarp'), [('out_file', 'brain')]),
+                            (inputnode, preprocess.get_node('invwarp'), [('T1w', 'brain')]),
                             (preprocess.get_node('Fregistration'), preprocess.get_node('invwarp'), [('out_mat', 'coregmat')]),
                             (preprocess.get_node('Fmni'), preprocess.get_node('invwarp'), [('brainmask', 'brainmask')]),
                             (preprocess.get_node('bet_strip'), preprocess.get_node('prelim'), [('out_file', 'in_file')]),

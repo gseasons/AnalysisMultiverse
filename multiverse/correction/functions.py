@@ -9,6 +9,22 @@ from functions import insert
 from nipype.utils.functions import getsource
 from workflows import write_out
 
+def ztop(copes, varcopes, dof):
+    from nipype.interfaces.base import CommandLine
+    from nipype.interfaces.fsl import ImageMaths, ImageStats
+    import os, re
+    cmd = ('ttologp -logpout {out} {varcope} {cope} {dof}')
+    out = os.getcwd()
+    contrast = re.search('.*/[_A-Za-z]+([0-9]+)', out).group(1)
+    out += '/logp{0}.nii.gz'.format(contrast)
+    dof = int(ImageStats(in_file=dof, op_string='-M').run().outputs.out_stat)
+    cl = CommandLine(cmd.format(out=out, varcope=varcopes, cope=copes, dof=dof))
+    cl.run().runtime.stdout
+    
+    pimage = ImageMaths(in_file=out, op_string='-exp').run().outputs.out_file
+    
+    return pimage
+
 def fdr(p_im, mask, q):
     from nipype.interfaces.base import CommandLine
     import re
@@ -44,11 +60,11 @@ def neg(vals):
         
     return val
 
-def correction(zstat, copes, mask, cor):
+def correction(zstat, copes, varcopes, dof, mask, cor):
     from correction.workflows import FDR, FWE, clusterFWE
     method = cor['method']
     if method == 'fdr':
-        corrected = FDR(zstat, mask, cor)
+        corrected = FDR(copes, varcopes, dof, mask, cor)
     elif method == 'fwe':
         corrected = FWE(zstat, mask, cor)
     elif method == 'clust':

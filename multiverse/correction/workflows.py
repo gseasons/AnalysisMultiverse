@@ -5,8 +5,8 @@ Created on Tue Oct 26 12:47:09 2021
 
 @author: grahamseasons
 """
-def FDR(zstat, mask, cor):
-    from correction.functions import fdr
+def FDR(copes, varcopes, dof, mask, cor):
+    from correction.functions import fdr, ztop
     from nipype import MapNode, Function
     from nipype.interfaces.fsl import ImageMaths, Threshold, BinaryMaths
     import os
@@ -14,24 +14,17 @@ def FDR(zstat, mask, cor):
     
     cor['q'] = cor.pop('p')
 
-    pos_thresh = MapNode(Threshold(direction='below'), name='pos_thresh', iterfield='in_file', nested=True, base_dir=base_dir)
-    pos_thresh.inputs.thresh = 0
-    pos_thresh.inputs.in_file = zstat
-    pthreshed = pos_thresh.run().outputs.out_file
+    pfile = MapNode(Function(input_names=['copes', 'varcopes', 'dof'],
+                                output_names=['p_image'], function=ztop), 
+                       name='pfile', iterfield=['copes', 'varcopes', 'dof'], nested=True, base_dir=base_dir)
+    pfile.inputs.copes = copes
+    pfile.inputs.varcopes = varcopes
+    pfile.inputs.dof = dof
+    p_file_pos = pfile.run().outputs.p_image
     
-    neg_thresh = MapNode(Threshold(direction='above'), name='neg_thresh', iterfield='in_file', nested=True, base_dir=base_dir)
-    neg_thresh.inputs.thresh = 0
-    neg_thresh.inputs.in_file = zstat
-    nthreshed = neg_thresh.run().outputs.out_file
-    
-    p_file_pos = MapNode(ImageMaths(op_string='-ztop', suffix='_pval'), 
-                     name='p_file_pos', iterfield=['in_file'], nested=True, base_dir=base_dir)
-    p_file_pos.inputs.in_file = pthreshed
-    p_file_pos = p_file_pos.run().outputs.out_file
-    
-    p_file_neg = MapNode(ImageMaths(op_string='-ztop -mul -1 -add 1', suffix='_pval'), 
+    p_file_neg = MapNode(ImageMaths(op_string='-mul -1 -add 1', suffix='_pval'), 
                      name='p_file_neg', iterfield=['in_file'], nested=True, base_dir=base_dir)
-    p_file_neg.inputs.in_file = nthreshed
+    p_file_neg.inputs.in_file = p_file_pos
     p_file_neg = p_file_neg.run().outputs.out_file
     
     form_pos = MapNode(Function(input_names=['p_im', 'mask', 'q'],
@@ -60,7 +53,7 @@ def FDR(zstat, mask, cor):
     corrected_neg.inputs.op_string = neg
     corrected_neg = corrected_neg.run().outputs.out_file
     
-    flip = MapNode(ImageMaths(op_string='-mul -1'), name='corrected_neg_flip', iterfield=['in_file'], nested=True, base_dir=base_dir)
+    flip = MapNode(ImageMaths(op_string='-mul -1', mask_file=mask), name='corrected_neg_flip', iterfield=['in_file'], nested=True, base_dir=base_dir)
     flip.inputs.in_file = corrected_neg
     corrected_neg = flip.run().outputs.out_file
     
@@ -75,6 +68,7 @@ def FDR(zstat, mask, cor):
     corrected_all.inputs.out_file = out_names
     
     return corrected_all.run().outputs.out_file
+
 
 def FWE(zstat, mask, cor):
     from correction.functions import fwe, neg

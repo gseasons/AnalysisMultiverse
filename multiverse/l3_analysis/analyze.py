@@ -34,10 +34,11 @@ class level3:
                         (inputnode, level3.get_node('flameo'), [(('mask', mniMask), 'mask_file')]),
                         ])
         
-        outnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'zstats', 'flameo_stats', 'mask']), name='outnode')
+        outnode = Node(IdentityInterface(fields=['copes', 'varcopes', 'dof', 'zstats', 'flameo_stats', 'mask']), name='outnode')
         
         level3.connect([(level3.get_node('flameo'), outnode, [(('copes', remove_container), 'copes'),
                                                               (('var_copes', remove_container), 'varcopes'),
+                                                              (('tdof', remove_container), 'dof'),
                                                               (('zstats', remove_container), 'zstats'),
                                                               (('stats_dir', remove_container), 'flameo_stats')]),
                         (inputnode, outnode, [(('mask', mniMask), 'mask')]),

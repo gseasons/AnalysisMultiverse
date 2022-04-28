@@ -35,9 +35,10 @@ def remove_container(cont):
     
 def mniMask(mask):
     import os
-    old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+    old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm.nii.gz')
+    #old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
     if mask == old:
-        mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain_mask_dil1.nii.gz')
+        mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain_mask_dil.nii.gz')
     
     return mask
 

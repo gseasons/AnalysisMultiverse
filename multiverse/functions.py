@@ -634,6 +634,7 @@ def load(path, file):
     return loaded
 
 def save(path, file, frame):
+    out_dir = '/Volumes/NewVolume/_i_0'
     out = os.path.join(out_dir, path)
     Path(out).mkdir(parents=True, exist_ok=True)
     out = os.path.join(out, file)
@@ -652,7 +653,8 @@ def organize(task, out_frame):
                       }
     """
     processed = {'pipeline': {}, 'constants': {}}
-    pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
+    #pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
+    pathlist = Path('/Volumes/NewVolume/_i_0/').glob('**/*_corrected_[0-9]*')
     dat_frame = out_frame
     
     with open(dat_frame, 'rb') as file:
@@ -678,6 +680,25 @@ def organize(task, out_frame):
             col = pipe_dat[column]
             if (comp[i] == dat_frame[column]).all():
                 processed['constants'][column] = col
+                if isinstance(col, dict):
+                    for key in col:
+                        if task == 'rest':
+                            if isinstance(key, str) and ('gamma' in key or 'dgamma' in key):
+                                processed['constants'][column] = key
+                                processed['constants']['derivs'] = col[key]['derivs']
+                            elif isinstance(key, str) and 'custom' in key:
+                                processed['constants'][column] = key
+                                processed['constants']['derivs'] = False
+                            elif key == 'seedinfo':
+                                processed['constants'][key+'region'] = col[key][0][0]
+                                processed['constants'][key+'threshold'] = col[key][0][1]
+                            else:
+                                processed['constants']['parameters'][key] = col[key]
+                        else:
+                            processed['constants'][key] = col[key]
+                else:
+                    processed['constants'][column] = col
+                    
                 continue
             
             if 'parameters' not in processed['pipeline'][pipeline]:
@@ -686,22 +707,41 @@ def organize(task, out_frame):
             if isinstance(col, dict):
                 for key in col:
                     if task == 'rest':
-                        if 'gamma' in col[key] or 'dgamma' in col[key]:
-                            processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]['derivs']
-                        elif 'custom' in col[key]:
-                            processed['pipeline'][pipeline]['parameters']['derivs'] = False
+                        if isinstance(key, str) and ('gamma' in key or 'dgamma' in key):
+                            processed['pipeline'][pipeline]['parameters'][column] = key
+                            processed['pipeline'][pipeline]['parameters']['l1d_derivs'] = col[key]['derivs']
+                        elif isinstance(key, str) and 'custom' in key:
+                            processed['pipeline'][pipeline]['parameters'][column] = key
+                            processed['pipeline'][pipeline]['parameters']['l1d_derivs'] = False
+                        elif key == 'seedinfo':
+                            processed['pipeline'][pipeline]['parameters'][key+'region'] = col[key][0][0]
+                            processed['pipeline'][pipeline]['parameters'][key+'threshold'] = col[key][0][1]
                         else:
-                            processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]
+                            processed['pipeline'][pipeline]['parameters'][key] = col[key]
                     else:
-                        processed['pipeline'][pipeline]['parameters']['derivs'] = col[key]
+                        processed['pipeline'][pipeline]['parameters'][key] = col[key]
             else:
                 processed['pipeline'][pipeline]['parameters'][column] = col
     
     return save('', task+'_organized.pkl', processed)
 
+def mniMask(mask):
+    import os
+    old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm.nii.gz')
+    #old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+    if mask == old:
+        mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain_mask_dil.nii.gz')
+    
+    return mask
 
-
-
+def mniMaskpre(mask):
+    import os
+    old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm.nii.gz')
+    #old = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+    if mask == old:
+        mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+    
+    return mask
 
 
 

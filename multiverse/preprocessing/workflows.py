@@ -185,21 +185,21 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
     forreho = unsmoothed
     if np.any(params):
         out_name = re.search('/([A-Za-z0-9_-]+).nii', unsmoothed).group(1) + '_regressed.nii.gz'
-        unsmoothed = ImageMaths(in_file=unsmoothed, mask_file=mask).run().outputs.out_file
+        #unsmoothed = ImageMaths(in_file=unsmoothed, mask_file=mask).run().outputs.out_file
         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
     
         regressed = glm.run().outputs.out_res
         add = abs(ImageStats(in_file=unsmoothed, op_string='-M').run().outputs.out_stat)
-        unsmoothed = ImageMaths(in_file=regressed, mask_file=mask, args='-add '+str(add)).run().outputs.out_file
+        unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
         
     if np.any(reho) and not np.array_equal(reho, params):
         out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
-        forreho = ImageMaths(in_file=forreho, mask_file=mask, suffix='reho').run().outputs.out_file
+        #forreho = ImageMaths(in_file=forreho, mask_file=mask, suffix='reho').run().outputs.out_file
         glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
     
         regressed = glm.run().outputs.out_res
         add = abs(ImageStats(in_file=forreho, op_string='-M').run().outputs.out_stat)
-        forreho = ImageMaths(in_file=regressed, mask_file=mask, args='-add '+str(add)).run().outputs.out_file
+        forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
         
     return unsmoothed, forreho
 

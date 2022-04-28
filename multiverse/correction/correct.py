@@ -19,7 +19,7 @@ class correction:
         correction = Workflow('correction')
         correction.base_dir = os.getcwd()
         
-        inputnode = Node(IdentityInterface(fields=['zstat', 'copes', 'mask']), name='inputnode')
+        inputnode = Node(IdentityInterface(fields=['zstat', 'copes', 'varcopes', 'dof', 'mask']), name='inputnode')
         
         intermediates = ['corrected_files']
         
@@ -27,6 +27,8 @@ class correction:
         
         correction.connect([(inputnode, correction.get_node('correct'), [('zstat', 'zstat'),
                                                                          ('copes', 'copes'),
+                                                                         ('varcopes', 'varcopes'),
+                                                                         ('dof', 'dof'),
                                                                          ('mask', 'mask')]),
                             ])
         
@@ -47,7 +49,7 @@ class correction:
         
     def decision(self, flow):
         from correction.functions import correction
-        correct = Node(Function(input_names=['zstat', 'copes', 'mask', 'cor'],
+        correct = Node(Function(input_names=['zstat', 'copes', 'varcopes', 'dof', 'mask', 'cor'],
                                 output_names=['corrected_files'], 
                                 function=correction), name='correct')
         

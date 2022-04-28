@@ -239,6 +239,8 @@ class analysis:
                                       ('varcopes', 'inputnode.varcopes')]),
                       (l3, correct, [('outnode.copes', 'inputnode.copes'),
                                      ('outnode.zstats', 'inputnode.zstat'),
+                                     ('outnode.varcopes', 'inputnode.varcopes'),
+                                     ('outnode.dof', 'inputnode.dof'),
                                      ('outnode.mask', 'inputnode.mask')]),
                       ])
         

@@ -30,7 +30,7 @@ exp_dir = '/scratch'
 working_dir = 'working_dir'
 data_dir = '/data'
 out_dir = exp_dir + '/processed'
-mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
+mask = opj(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm.nii.gz')
 dir = os.path.dirname(os.path.abspath(__file__))
 
 def fix_links(dic):
