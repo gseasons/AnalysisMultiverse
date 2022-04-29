@@ -287,7 +287,7 @@ def on_pop_gen(ga):
                         save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                     
                     save_dir = out_dir + '/checkpoints_' + task + '_batch_' + str(batch)
-                    config.set("execution", "crashdump_dir", save_dir)
+                    conf.set("execution", "crashdump_dir", save_dir)
                     
                     pipelines.run(plugin=config['processing'], plugin_args=plugin_args)
                 

@@ -10,7 +10,8 @@ from nipype import Workflow, Node, IdentityInterface, Function, DataSink
 from nipype.interfaces.fsl import ExtractROI, MCFLIRT, SliceTimer, FAST, UnaryMaths
 from nipype.algorithms.rapidart import ArtifactDetect
 import os, glob
-from preprocessing.functions import get_wm, get_sink, mniMask, mniMaskpre
+from preprocessing.functions import get_wm, get_sink
+from functions import mniMask, mniMaskpre
 #from niworkflows.anat.ants import init_brain_extraction_wf
 from niworkflows.func.util import init_enhance_and_skullstrip_bold_wf
 

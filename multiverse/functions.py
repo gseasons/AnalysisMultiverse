@@ -634,7 +634,7 @@ def load(path, file):
     return loaded
 
 def save(path, file, frame):
-    out_dir = '/Volumes/NewVolume/_i_0'
+    #out_dir = '/Volumes/NewVolume/_i_0'
     out = os.path.join(out_dir, path)
     Path(out).mkdir(parents=True, exist_ok=True)
     out = os.path.join(out, file)
@@ -653,8 +653,8 @@ def organize(task, out_frame):
                       }
     """
     processed = {'pipeline': {}, 'constants': {}}
-    #pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
-    pathlist = Path('/Volumes/NewVolume/_i_0/').glob('**/*_corrected_[0-9]*')
+    pathlist = Path(out_dir+'/pipelines/'+task).glob('**/*_corrected_[0-9]*')
+    #pathlist = Path('/Volumes/NewVolume/_i_0/').glob('**/*_corrected_[0-9]*')
     dat_frame = out_frame
     
     with open(dat_frame, 'rb') as file:
