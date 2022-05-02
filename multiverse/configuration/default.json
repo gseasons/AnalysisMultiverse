@@ -327,14 +327,14 @@
                 },
                 {
                     "on_off": "on",
-                    "alias": "Bandpass upper threshold",
+                    "alias": "ReHo Bandpass upper threshold",
                     "name": "rest_lp",
                     "value": [0.1],
                     "default": 0
                 },
                 {
                     "on_off": "on",
-                    "alias": "Bandpass lower threshold",
+                    "alias": "ReHo Bandpass lower threshold",
                     "name": "rest_hp",
                     "value": [0.01],
                     "default": 0
@@ -342,7 +342,7 @@
             ]
         },
         {
-            "alias": "High Pass Filtering",
+            "alias": "High Pass Filtering (s)",
             "node_name": "Finfo",
             "params": [
                 {
@@ -355,7 +355,7 @@
             ]
         },
         {
-            "alias": "Low Pass Filtering",
+            "alias": "Low Pass Filtering (Hz)",
             "node_name": "Finfo",
             "params": [
                 {
