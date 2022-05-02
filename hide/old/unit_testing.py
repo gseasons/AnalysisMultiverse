@@ -12,6 +12,23 @@ from nipype import config, Workflow, Node, IdentityInterface, Function
 
 from nipype.utils.draw_gantt_chart import generate_gantt_chart
 
+from pathlib import Path
+import shutil
+import os, glob, re
+
+B = glob.glob('/Volumes/NewVolume/super_agers/**/anat/sub-**T1w.nii.gz')
+A = glob.glob('/Volumes/NewVolume/brain_extracted/**/**_masked.nii.gz')
+
+for i, path in enumerate(A):
+    for egg in B:
+        sub = re.search('.*/sub-([0-9S]+)', egg).group(1)
+        dest = re.search('(/.*/)sub-.*', path).group(1)
+        name = re.search('/.*/(sub-.*).nii.gz', egg).group(1)
+        if sub in path:
+            shutil.copyfile(egg, dest+name+'.nii.gz')
+            os.rename(path, dest+name+'_brain.nii.gz')
+            
+A = 3
 
 # =============================================================================
 # def registration(T1w, mask, start_img, corrected_img, bet, wm_file, bbr, regpre_interp, regpre_no_resample, applywarp_apply_isoxfm, applywarp_apply_xfm, applywarp_uses_qform, concatenate, regbbr_interp, regbbr_no_resample, applywarp_interp, applywarp_no_resample):
