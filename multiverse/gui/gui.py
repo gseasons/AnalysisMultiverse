@@ -293,7 +293,7 @@ class MultiverseConfig():
         self.mem.insert(4, '6')
         self.mem.grid(row=5, column=1)
         #NEED BETTER BENCHMARK
-        ttk.Label(self.slurm_frame, text='Time ~2H * (subject,scan,pipeline) / CPUs').grid(row=6)
+        ttk.Label(self.slurm_frame, text='Time ~2.4H * (subject,scan,pipeline) / CPUs').grid(row=6)
         
         ttk.Label(self.slurm_frame, text='Job time (Days-Hours:Mins):').grid(row=7)
         self.time = ttk.Entry(self.slurm_frame)
