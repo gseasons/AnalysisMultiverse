@@ -48,7 +48,7 @@ Software for automated multiverse analysis for fMRI
      iii. Finally, changes to the default.json file will need to be made to add new parameters
 
 # Resource Allocation
- - On compute canada ~4 days for 50 subjects x 200 pipelines with 200 CPUs, 6gb RAM per CPU
+ - On compute canada ~1.2 days for 50 subjects x 8 pipelines with 32 CPUs, 6gb RAM per CPU
  - Potential issue: There is a file cap on compute canada of 1000k (Graham), which may result in workflow crashing (likely need to get this extended)
  - Generates a lot of data, peaking at ~0.83GB per subject per pipeline
    a. Running with debug set to false will delete files once they are no longer needed by the workflow
