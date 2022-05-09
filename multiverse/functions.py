@@ -666,7 +666,10 @@ def organize(task, out_frame):
         path = str(path)
         network = int(re.search('.*_network_([0-9]+)', path).group(1))
         contrast = int(re.search('.*_corrected_([0-9]+).nii.gz', path).group(1))
-        pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
+        try:
+            pipeline = int(re.search('.*_i_([0-9]+)', path).group(1))
+        except:
+            pipeline = 0
         if pipeline in processed['pipeline']:
             if network in processed['pipeline'][pipeline]['network']:
                 processed['pipeline'][pipeline]['network'][network]['contrast'][contrast] = path

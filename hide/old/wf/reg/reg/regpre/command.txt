@@ -1,2 +1,0 @@
-flirt -in /Volumes/NewVolume/a_copy/sub-031S0618_task-rest_bold_roi_mcf_roi.nii.gz -ref /Volumes/NewVolume/a_copy/sub-031S0618_T1w_corrected_xform_masked.nii.gz -out sub-031S0618_task-rest_bold_roi_mcf_roi_flirt.nii.gz -omat sub-031S0618_task-rest_bold_roi_mcf_roi_flirt.mat -dof 6 -interp spline -noresample
-

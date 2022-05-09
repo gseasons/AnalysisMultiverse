@@ -41,21 +41,32 @@ def smooth(warped, mask):
     from nipype.interfaces.fsl import (ImageMaths, ImageStats, SUSAN, IsotropicSmooth)
     import os, glob, re
     from preprocessing.functions import get_bright_thresh, getthreshop
+    #FROM: https://github.com/nipy/nipype/blob/6d8efd74f7f019298c00f5486db479fef5657561/nipype/workflows/fmri/fsl/preprocess.py
+    from legacy.susan import create_susan_smooth
     
     susan = vars().get('susan', True)
     fwhm = vars().get('fwhm', 6)
     
     if susan:
-        maskfunc = ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask, in_file=warped).run().outputs.out_file
-        getthresh = ImageStats(op_string='-p 2 -p 98', in_file=maskfunc).run().outputs.out_stat
-        getthreshop_ = getthreshop(getthresh)
-        threshold = ImageMaths(out_data_type='char', suffix='_thresh', in_file=maskfunc, op_string=getthreshop_).run().outputs.out_file
-        
-        medianval = ImageStats(op_string='-k %s -p 50', in_file=warped, mask_file=threshold).run().outputs.out_stat
-        
-        brightthresh = get_bright_thresh(medianval)
-        
-        smoothed = SUSAN(fwhm=fwhm, brightness_threshold=brightthresh, in_file=warped).run().outputs.smoothed_file
+        smoothed = create_susan_smooth()
+        smoothed.inputs.inputnode.in_files = warped
+        smoothed.inputs.inputnode.mask_file = mask
+        smoothed.inputs.inputnode.fwhm = fwhm
+        smoothed.base_dir = os.getcwd()
+        smoothed.run()
+# =============================================================================
+#         maskfunc = ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask, in_file=warped).run().outputs.out_file
+#         getthresh = ImageStats(op_string='-p 2 -p 98', in_file=maskfunc).run().outputs.out_stat
+#         getthreshop_ = getthreshop(getthresh)
+#         threshold = ImageMaths(out_data_type='char', suffix='_thresh', in_file=maskfunc, op_string=getthreshop_).run().outputs.out_file
+#         
+#         medianval = ImageStats(op_string='-k %s -p 50', in_file=warped, mask_file=threshold).run().outputs.out_stat
+#         
+#         brightthresh = get_bright_thresh(medianval)
+#         
+#         smoothed = SUSAN(fwhm=fwhm, brightness_threshold=brightthresh, in_file=warped).run().outputs.smoothed_file
+# =============================================================================
+        smoothed = glob.glob(os.getcwd() + '/susan_smooth/smooth/**/**/**_smooth.nii.gz')[0]
     else:
         smoothed = IsotropicSmooth(fwhm=fwhm, in_file=warped, output_type='NIFTI').run().outputs.out_file
         
@@ -189,17 +200,25 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
     
         regressed = glm.run().outputs.out_res
-        add = abs(ImageStats(in_file=unsmoothed, op_string='-M').run().outputs.out_stat)
-        unsmoothed = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+        add = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0]
+        if add < 0:
+            add = abs(add)
+        else:
+            add = 0
+        unsmoothed = ImageMaths(in_file=regressed, args='-add {0}'.format(add)).run().outputs.out_file
         
     if np.any(reho) and not np.array_equal(reho, params):
         out_name = re.search('/([A-Za-z0-9_-]+).nii', forreho).group(1) + '_reho_regressed.nii.gz'
         #forreho = ImageMaths(in_file=forreho, mask_file=mask, suffix='reho').run().outputs.out_file
         glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
-    
+
         regressed = glm.run().outputs.out_res
-        add = abs(ImageStats(in_file=forreho, op_string='-M').run().outputs.out_stat)
-        forreho = ImageMaths(in_file=regressed, args='-add '+str(add)).run().outputs.out_file
+        add = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0]
+        if add < 0:
+            add = abs(add)
+        else:
+            add = 0
+        forreho = ImageMaths(in_file=regressed, args='-add {0}'.format(add)).run().outputs.out_file
         
     return unsmoothed, forreho
 

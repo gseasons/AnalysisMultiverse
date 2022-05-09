@@ -29,9 +29,9 @@ srun singularity run -B $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_b
 #srun singularity run -B $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_base -B ~/.ipython:/scratch/.ipython -B ~/multiverse:/code/multiverse -B $1:/data $container ipengine --profile=${profile} --location=$(hostname) --log-to-file &
 sleep 45
 echo "Launching Job"
-#if templateflow breaks
-singularity exec -H $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_base -B ~/multiverse/templateflow:/scratch/.cache/templateflow -B ~/.ipython:/scratch/.ipython -B ~/multiverse:/code/multiverse -B $1:/data \
 #normal
 #singularity exec -H $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_base -B ~/.ipython:/scratch/.ipython -B ~/multiverse:/code/multiverse -B $1:/data \
+#if templateflow breaks
+singularity exec -H $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_base -B ~/multiverse/templateflow:/scratch/.cache/templateflow -B ~/.ipython:/scratch/.ipython -B ~/multiverse:/code/multiverse -B $1:/data \
 $container /bin/bash -c \
 "source activate multiverse ; export USER=$USER ; python /code/multiverse/run_multiverse.py ${3} ${profile}"

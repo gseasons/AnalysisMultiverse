@@ -11,10 +11,190 @@ from nipype import IdentityInterface, Node, DataSink
 from nipype import config, Workflow, Node, IdentityInterface, Function
 
 from nipype.utils.draw_gantt_chart import generate_gantt_chart
-
+from nipype.interfaces.fsl.maths import MaxImage
+from nipype.interfaces.fsl import ImageMeants, ImageStats, ImageMaths
+from nipype.interfaces.fsl import FAST, FLIRT
+from nipype.interfaces.fsl import WarpPointsToStd
+from nipype.interfaces.fsl import WarpPoints, Merge
+from nipype.interfaces.fsl.maths import MathsCommand
+from nipype.interfaces.fsl import ConvertXFM, InvWarp
+import numpy as np
 from pathlib import Path
 import shutil
 import os, glob, re
+import nibabel as nib
+import subprocess
+
+# =============================================================================
+# for brain in glob.glob('/Volumes/NewVolume/brain_extracted/**/sub-**T1w_brain.nii.gz'):
+#     sub1 = re.search('.*/sub-([0-9S]+)', brain).group(1)
+#     for bold in glob.glob('/Volumes/NewVolume/super_agers/**/func/sub-**_bold.nii.gz'):
+#         sub2 = re.search('.*/sub-([0-9S]+)', bold).group(1)
+#         if sub1 == sub2:
+#             with open('/Users/grahamseasons/repro.fsf', 'r') as f:
+#                 filedata = f.read()
+#             
+#             str1 = re.search('set feat_files\(1\) "(.*)"', filedata).group(1)
+#             filedata = filedata.replace(str1, bold[:-7])
+#             
+#             str2 = re.search('set highres_files\(1\) "(.*)"', filedata).group(1)
+#             filedata = filedata.replace(str2, brain[:-7])
+#             
+#             str3 = re.search('set fmri\(npts\) (.*)', filedata).group(1)
+#             filedata = filedata.replace(str3, str(nib.load(bold).shape[-1]))
+#             
+#             str3 = re.search('set fmri\(outputdir\) "(.*)"', filedata).group(1)
+#             filedata = filedata.replace(str3, '/Volumes/NewVolume/feat1_' + sub1)
+#             
+#             with open('/Users/grahamseasons/repro.fsf', 'w') as f:
+#                 f.write(filedata)
+#                 
+#             subprocess.call(['feat', '/Users/grahamseasons/repro.fsf'])
+# =============================================================================
+            
+
+np.savetxt('std_coords.txt', np.array([1,-55,17]))            
+
+for folder in glob.glob('/Volumes/NewVolume/feat1_**.feat'):
+    folder = '/Volumes/NewVolume/super_agers/sub-003S6014/func/sub-003S6014_task-rest_bold++.feat'
+    image = folder + '/filtered_func_data.nii.gz'
+    T1w = folder + '/reg/highres.nii.gz'
+    seg1 = FAST(in_files=T1w, out_basename='fast_', segments=True).run().outputs.tissue_class_files
+    seg = []
+    mat = ConvertXFM(in_file=folder+'/reg/example_func2highres.mat', invert_xfm=True).run().outputs.out_file
+    wrp = InvWarp(reference=T1w, warp=folder+'/reg/highres2standard_warp.nii.gz').run().outputs.inverse_warp
+    for egg in seg1:
+        seg.append(FLIRT(in_file=egg, reference=image, interp='nearestneighbour', apply_xfm=True, in_matrix_file=mat).run().outputs.out_file)
+    glo = MaxImage(in_file=Merge(in_files=seg, dimension='t').run().outputs.merged_file, dimension='T').run().outputs.out_file
+    glo_ts = ImageMeants(in_file=image, mask=glo, out_file='global_ts.txt').run().outputs.out_file
+    regress = np.genfromtxt(glo_ts)
+    regress = regress.reshape(regress.shape[0], 1)
+    wm = seg[-1]
+    wm_ts = ImageMeants(in_file=image, mask=wm, out_file='wm_ts.txt').run().outputs.out_file
+    wm_ = np.genfromtxt(wm_ts)
+    wm_ = wm_.reshape(wm_.shape[0], 1)
+    csf = seg[0]
+    csf_ts = ImageMeants(in_file=image, mask=csf, out_file='csf_ts.txt').run().outputs.out_file
+    csf_ = np.genfromtxt(csf_ts)
+    csf_ = csf_.reshape(csf_.shape[0], 1)
+    regress = np.append(regress, wm_, 1)
+    regress = np.append(regress, csf_, 1)
+    
+    motion = folder + '/mc/prefiltered_func_data_mcf.par'
+    m_ = np.genfromtxt(motion)
+    regress = np.append(regress, m_, 1)
+    
+    np.savetxt('regress.txt', regress, delimiter= " ", fmt="%s")
+    regress = 'regress.txt'
+    
+    sub = re.search('.*/feat1_([0-9S]+).', image).group(1)
+    with open('/Users/grahamseasons/repro_regress.fsf', 'r') as f:
+        filedata = f.read()
+        
+    str1 = re.search('set feat_files\(1\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set feat_files(1) "{0}"'.format(str1), 'set feat_files(1) "{0}"'.format(image[:-7]))
+    
+    str2 = re.search('set confoundev_files\(1\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set confoundev_files(1) "{0}"'.format(str2), 'set confoundev_files(1) "{0}"'.format(regress))
+    
+    #str4 = re.search('set fmri\(motionevsbeta\) "(.*)"', filedata).group(1)
+    #filedata = filedata.replace('set fmri(motionevsbeta) "{0}"'.format(str4), 'set fmri(motionevsbeta) "{0}"'.format(motion))
+    
+    str5 = re.search('set fmri\(npts\) (.*)', filedata).group(1)
+    filedata = filedata.replace('set fmri(npts) {0}'.format(str5), 'set fmri(npts) {0}'.format(str(nib.load(image).shape[-1])))
+    
+    str3 = re.search('set fmri\(outputdir\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set fmri(outputdir) "{0}"'.format(str3), 'set fmri(outputdir) "{0}"'.format('/Volumes/NewVolume/feat2_' + sub))
+    
+    with open('/Users/grahamseasons/repro_regress.fsf', 'w') as f:
+        f.write(filedata)
+        
+    subprocess.call(['feat', '/Users/grahamseasons/repro_regress.fsf'])
+    
+    os.rename(image, image[:-7]+'_stage1.nii.gz')
+    add = abs(ImageStats(in_file='/Volumes/NewVolume/feat2_{0}.feat/stats/res4d.nii.gz'.format(sub), op_string='-R').run().outputs.out_stat[0])
+    altered = ImageMaths(in_file='/Volumes/NewVolume/feat2_{0}.feat/stats/res4d.nii.gz'.format(sub), args='-add {0}'.format(add)).run().outputs.out_file
+    
+    shutil.copyfile(altered, '/Volumes/NewVolume/feat1_{0}.feat/filtered_func_data.nii.gz'.format(sub))
+    
+    with open('/Users/grahamseasons/repro_smooth.fsf', 'r') as f:
+        filedata = f.read()
+    
+    str1 = re.search('set feat_files\(1\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set feat_files(1) "{0}"'.format(str1), 'set feat_files(1) "{0}"'.format(image[:-7]))
+    
+    str5 = re.search('set fmri\(npts\) (.*)', filedata).group(1)
+    filedata = filedata.replace('set fmri(npts) {0}'.format(str5), 'set fmri(npts) {0}'.format(str(nib.load(image).shape[-1])))
+    
+    str3 = re.search('set fmri\(outputdir\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set fmri(outputdir) "{0}"'.format(str3), 'set fmri(outputdir) "{0}"'.format('/Volumes/NewVolume/feat3_' + sub))
+    
+    with open('/Users/grahamseasons/repro_smooth.fsf', 'w') as f:
+        f.write(filedata)
+        
+    subprocess.call(['feat', '/Users/grahamseasons/repro_smooth.fsf'])
+    
+    os.rename(image, image[:-7]+'_stage2.nii.gz')
+    shutil.copyfile('/Volumes/NewVolume/feat3_{0}.feat/filtered_func_data.nii.gz'.format(sub), '/Volumes/NewVolume/feat1_{0}.feat/filtered_func_data.nii.gz'.format(sub))
+    
+    with open('/Users/grahamseasons/repro_l1.fsf', 'r') as f:
+        filedata = f.read()
+    
+    str1 = re.search('set feat_files\(1\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set feat_files(1) "{0}"'.format(str1), 'set feat_files(1) "{0}"'.format(image))
+    
+    str5 = re.search('set fmri\(npts\) (.*)', filedata).group(1)
+    filedata = filedata.replace('set fmri(npts) {0}'.format(str5), 'set fmri(npts) {0}'.format(str(nib.load(image).shape[-1])))
+    
+    shape = nib.load(T1w).shape
+    x = 44
+    y = 35
+    z = 44
+    
+    best_coords = []
+    distold = 10000
+    
+    np.savetxt('warp_coords.txt', np.array([x,y,z]))
+    WarpPoints(in_coords='warp_coords.txt', src_file=folder+'/reg/standard.nii.gz', dest_file=folder+'/reg/highres.nii.gz', warp_file=wrp, out_file='warped_coords.txt').run().outputs.out_file
+                    
+    shape = nib.load(image).shape
+    x = shape[0]
+    y = shape[1]
+    z = shape[2]
+    
+    distold = 10000
+    
+    np.savetxt('warp_coords.txt', np.array([x,y,z]))
+    WarpPoints(in_coords='warped_coords.txt', src_file=T1w, dest_file=image, xfm_file=mat, out_file='shifted_coords.txt').run().outputs.out_file
+    best_coords = np.loadtxt('shifted_coords.txt').astype(int)
+                    
+    createseed = MathsCommand(in_file=folder+'/mask.nii.gz', output_datatype='float')
+    createseed.inputs.args = '-mul 0 -add 1 -roi {x} 1 {y} 1 {z} 1 0 1'.format(x=best_coords[0], y=best_coords[1], z=best_coords[2])
+    seed = createseed.run().outputs.out_file
+    makesphere = Node(MathsCommand(in_file=seed), name='makesphere')
+    makesphere.inputs.args = '-kernel sphere 4 -fmean'
+    
+    thrseed = ImageMaths(op_string='-bin')
+    thrseed.inputs.in_file = makesphere.run().outputs.out_file
+    thrfile = thrseed.run().outputs.out_file
+    
+    ts = ImageMeants(in_file=image, mask=thrfile).run().outputs.out_file
+    
+    str3 = re.search('set fmri\(custom1\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set fmri(custom1) "{0}"'.format(str3), 'set fmri(custom1) "{0}"'.format(ts))
+    
+    str4 = re.search('set fmri\(outputdir\) "(.*)"', filedata).group(1)
+    filedata = filedata.replace('set fmri(outputdir) "{0}"'.format(str4), 'set fmri(outputdir) "{0}"'.format('/Volumes/NewVolume/feat4_' + sub))
+    
+    with open('/Users/grahamseasons/repro_l1.fsf', 'w') as f:
+        f.write(filedata)
+        
+    subprocess.call(['feat', '/Users/grahamseasons/repro_l1.fsf'])
+    
+    #os.rename(image, image[:-7]+'_stage3.nii.gz')
+    #shutil.copyfile('/Volumes/NewVolume/feat3_{0}.feat/filtered_func_data.nii.gz'.format(sub), '/Volumes/NewVolume/feat1_{0}.feat/filtered_func_data.nii.gz'.format(sub))
+    
+
 
 B = glob.glob('/Volumes/NewVolume/super_agers/**/anat/sub-**T1w.nii.gz')
 A = glob.glob('/Volumes/NewVolume/brain_extracted/**/**_masked.nii.gz')

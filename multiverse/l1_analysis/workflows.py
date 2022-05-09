@@ -18,7 +18,14 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
     
     model = Node(SpecifyModelVersatile(input_units='secs', parameter_source='FSL'), name='model')
     model.inputs.time_repetition = TR
-    model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
+    
+    highpass = True
+    
+    if not vars().get('HP', 128):
+        highpass = False
+        model.inputs.high_pass_filter_cutoff = 128
+    else:
+        model.inputs.high_pass_filter_cutoff = vars().get('HP', 128)
     
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -27,7 +34,8 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
     
     if vars().get('LP', False):
         lpfilter = TemporalFilter(in_file=smoothed)
-        lpfilter.inputs.lowpass_sigma = 1 / (2 * TR * vars().get('LP'))
+        #4.5 obtained heuristically by comparing conversion in typical feat
+        lpfilter.inputs.lowpass_sigma = 1 / (4.5 * TR * vars().get('LP'))
         smoothed = lpfilter.run().outputs.out_file
         
     model.inputs.functional_runs = smoothed
@@ -124,7 +132,7 @@ def info(mask, task, TR, event_file, unsmoothed, smoothed, brain, brainmask, out
         
         session_info[0]['scans'] = smoothed
         
-        return session_info, thrfile
+        return session_info, thrfile, highpass
     else:
         raise ValueError("Unhandled task of {task}. If resting state analysis ensure 'rest' is in the task name, otherwise ensure there is a valid event_file".format(task=task))
     

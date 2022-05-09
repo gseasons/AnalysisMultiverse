@@ -68,12 +68,13 @@ class preprocess(spatial_normalization):
                             #(preprocess.get_node('Fsmooth'), outnode, [('files', 'keepsmooth')]),
                             #(preprocess.get_node('warp'), outnode, [('field_file', 'warp_file')]),
                             (preprocess.get_node('Fmni'), outnode, [('warp', 'warp_file')]),
+                            (preprocess.get_node('Fmni'), outnode, [('brainmask', 'brainmask')]),
                             (preprocess.get_node('invwarp'), outnode, [('invwarp', 'invwarp')]),
                             #(preprocess.get_node('mcflirt'), outnode, [('par_file', 'mc_par')]),
                             (preprocess.get_node('art'), outnode, [('outlier_files', 'outliers')]),
                             #(preprocess.get_node('Fregistration'), outnode, [('out_mat', 'coregmat')]),
                             #(preprocess.get_node('Fregistration'), outnode, [('files', 'keepreg')]),
-                            (preprocess.get_node('fillmask'), outnode, [('out_file', 'brainmask')]),
+                            #(preprocess.get_node('fillmask'), outnode, [('out_file', 'brainmask')]),
                             ])
         
         if 'rest' in self.task:
@@ -130,7 +131,7 @@ class preprocess(spatial_normalization):
                                   plot_type='svg'),
                    name="art", mem_gb=0.5)
         
-        fillmask = Node(UnaryMaths(operation='fillh'), name='fillmask')
+        #fillmask = Node(UnaryMaths(operation='fillh'), name='fillmask')
         
         func_str, input_names = function_str('regress', func_dic)
         Fregress = Node(Function(input_names=input_names,
@@ -153,9 +154,9 @@ class preprocess(spatial_normalization):
                              #                                     ('mask', 'brainmask')]), SHOULDN'T BE NEEDED
                       (decision, flow.get_node('Fmni'), [('mask', 'brainmask')]),
                       (decision, flow.get_node('Fmni'), [('start_img', 'start_img')]),
-                      (flow.get_node('Fmni'), flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
+                      #(flow.get_node('Fmni'), flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
                       #(decision, flow.get_node('boldmask'), [('start_img', 'inputnode.in_file')]),
-                      (flow.get_node('boldmask'), fillmask, [('outputnode.skull_stripped_file', 'in_file')]),
+                      #(flow.get_node('boldmask'), fillmask, [('outputnode.skull_stripped_file', 'in_file')]),
                       (flow.get_node('Fregistration'), art, [('warped', 'realigned_files')]),
                       (flow.get_node('Fmni'), Fregress, [('warped', 'unsmoothed')]),
                       #MAYBE REPLACE THIS WITH OUTPUT OF FILLMASK
@@ -165,7 +166,8 @@ class preprocess(spatial_normalization):
                       #(art, Fregress, [('outlier_files', 'outliers')]),
                       (mcflirt, Fregress, [('par_file', 'mc_par')]),
                       (Fregress, Fsmooth, [('warped', 'warped')]),
-                      (fillmask, Fsmooth, [('out_file', 'mask')]),
+                      (flow.get_node('Fmni'), Fsmooth, [('brainmask', 'mask')]),
+                      #(fillmask, Fsmooth, [('out_file', 'mask')]),#MAYBE JUST USE FMI BRAINMASK HERE -> MIGHT GET RID OF SPECKLING
                       ])
         
         return brain_extracted
@@ -211,7 +213,7 @@ class preprocess(spatial_normalization):
                              name='Fmni', n_procs=4, mem_gb=1.5)
         Fmni.inputs.function_str = func_str
         
-        boldmask = init_enhance_and_skullstrip_bold_wf(name='boldmask', pre_mask=True)
+        #boldmask = init_enhance_and_skullstrip_bold_wf(name='boldmask', pre_mask=True)
         
         flow.connect([(bet_strip, fast, [('out_file', 'in_files')]),
                       (bet_strip, Fregistration, [('out_file', 'bet')]),
@@ -220,7 +222,7 @@ class preprocess(spatial_normalization):
                       (fast, Fmni, [('tissue_class_files', 'segmentations')]),
                       (Fregistration, Fmni, [('warped', 'warped')]),
                       (Fregistration, Fmni, [('out_mat', 'out_mat')]),
-                      (Fmni, boldmask, [('brainmask', 'inputnode.pre_mask')]),
+                      #(Fmni, boldmask, [('brainmask', 'inputnode.pre_mask')]),
                       ])
         
         return brain_extracted

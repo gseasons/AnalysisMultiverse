@@ -254,7 +254,7 @@ def on_pop_gen(ga):
             if 'anat' in types and 'func' in types and to_run:
                 if config['processing'] == 'SLURM' and 'num_generations' not in config:
                     save_dir = out_dir + '/reproducibility/checkpoints_' + task + '_batch_' + str(batch)
-                    config.set("execution", "crashdump_dir", save_dir)
+                    conf.set("execution", "crashdump_dir", save_dir)
                     
                     pipelines = analysis(exp_dir, task+'_'+working_dir+'_'+str(batch), data_dir, out_dir)
                     pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)

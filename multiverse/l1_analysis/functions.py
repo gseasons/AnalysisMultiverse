@@ -10,7 +10,7 @@ from nipype.utils.functions import getsource
 from workflows import write_out
 import re
 
-def no_tsplot(design):
+def editfsf(design, highpass):
     if isinstance(design, str):
         design_lst = [design]
     else:
@@ -21,13 +21,14 @@ def no_tsplot(design):
             data = f.read()
             
         data = data.replace('set fmri(tsplot_yn) 1', 'set fmri(tsplot_yn) 0')
+        data = data.replace('set fmri(temphp_yn) 1', 'set fmri(temphp_yn) 0')
         
         with open(des, 'w') as f:
             f.write(data)
         
     return design
 
-def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
+def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.1, hp=0.01):
     """Implements ReHo calculation"""
     from nipype import Node
     from nipype.interfaces.afni.utils import ReHo
@@ -38,7 +39,8 @@ def data_driven(mask, unsmoothed, k, kcc, TR, lp=0.01, hp=0.1):
     
     bpfilter = Node(TemporalFilter(in_file=unsmoothed), name='bpfilter', base_dir=base_dir)
     #HZ to sigma conversion taken from: https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;fc5b33c5.1205
-    bpfilter.inputs.lowpass_sigma = 1 / (2 * TR * lp)
+    #low pass adjustment is taken from comparing the regular output from feat (approximate)
+    bpfilter.inputs.lowpass_sigma = 1 / (4.5 * TR * lp)
     bpfilter.inputs.highpass_sigma = 1 / (2 * TR * hp)
     
     filtered = bpfilter.run().outputs.out_file

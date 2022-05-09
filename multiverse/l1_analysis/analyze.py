@@ -87,13 +87,13 @@ class level1(spatial_normalization):
         
         
     def l1(self, flow, func_dic):
-        from l1_analysis.functions import function_str, correct_task_timing, contrasts, no_tsplot
+        from l1_analysis.functions import function_str, correct_task_timing, contrasts, editfsf
         networks = Node(IdentityInterface(fields=['network']), name='networks')
         networks.iterables = ('network', range(self.networks))
         
         func_str, input_names = function_str('info', func_dic)
         if 'rest' in self.task:
-            outnames = ['session_info', 'seed']
+            outnames = ['session_info', 'seed', 'highpass']
         else:
             outnames = ['session_info']
         Finfo = Node(Function(input_names=input_names, output_names=outnames), name='Finfo', n_procs=2, mem_gb=1.5)
@@ -109,6 +109,11 @@ class level1(spatial_normalization):
                                   function=contrasts), name='contrasts')
         
         l1d = Node(Level1DesignVersatile(), name='l1d')
+        
+        editfsf = Node(Function(input_names=['design', 'highpass'], 
+                                  output_names=['fsf_file'],
+                                  function=editfsf), name='editfsf')
+        
         feat = Node(FEAT(), name='feat', n_procs=5, mem_gb=5)
         #MAYBE TRY AND FIX BEHAVIOUR WHERE IT PLUGINS_BASE DELETES EVERYTHING IF NODE FAILS -> BAD FOR RELOADING CHECKPOINTS, ETC.
         flow.connect([(networks, Finfo, [('network', 'network')]),
@@ -116,6 +121,8 @@ class level1(spatial_normalization):
                       (correction, contrasts, [('session_info', 'session_info')]),
                       (correction, l1d, [('session_info', 'session_info')]),
                       (contrasts, l1d, [('contrasts', 'contrasts')]),
-                      (l1d, feat, [(('fsf_files', no_tsplot), 'fsf_file')]),
+                      (l1d, editfsf, [('fsf_files', 'fsf_file')]),
+                      (Finfo, editfsf, [('highpass', 'highpass')]),
+                      (editfsf, feat, [('fsf_file', 'fsf_file')]),
                       ])
 
