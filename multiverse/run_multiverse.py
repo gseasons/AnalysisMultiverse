@@ -153,6 +153,9 @@ def on_pop_gen(ga):
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
         
+        shutil.copyfile('configuration/multiverse_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/multiverse_configuration.pkl')
+        shutil.copyfile('configuration/general_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/general_configuration.pkl')
+        
         if sessions or runs:
             multiscan = True
         else:
@@ -267,6 +270,8 @@ def on_pop_gen(ga):
                     else:
                         save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                         
+                    
+                        
                     if batch == (iterations-1):
                         sys.exit()
                 else:
@@ -296,6 +301,7 @@ def on_pop_gen(ga):
                     
                     if not config['debug'] and not glob.glob(save_dir + '/crash-*'):
                         os.rename(save_dir, save_dir + '_done')
+                        os.mkdir(out_dir + '/reproducibility/' + task + '_batch_' + str(batch) + '/configuration')
                         shutil.rmtree('/scratch/' + working_dir)
                 
     if 'num_generations' not in config:
@@ -322,7 +328,10 @@ def main():
         parent_selection_type = 'random'
         crossover_type = 'single_point'
         mutation_type = 'random'
-        sol_per_pop = config['pipelines']
+        if config['pipelines'] == 1:
+            sol_per_pop = 2
+        else:
+            sol_per_pop = config['pipelines']
     
     gene_space = []
     dummy = 0
