@@ -153,6 +153,7 @@ def on_pop_gen(ga):
         sessions = layout.get_sessions(task=task)
         runs = layout.get_runs(task=task)
         
+        os.makedirs(out_dir + '/reproducibility/' + task + '/configuration/', exist_ok=True)
         shutil.copyfile('configuration/multiverse_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/multiverse_configuration.pkl')
         shutil.copyfile('configuration/general_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/general_configuration.pkl')
         
