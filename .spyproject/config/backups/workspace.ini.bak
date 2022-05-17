@@ -6,5 +6,5 @@ save_non_project_files = False
 
 [main]
 version = 0.2.0
-recent_files = ['multiverse.py', 'multiverse/run_multiverse.py', 'hide/old/unit_testing.py', 'multiverse/plugins_base.py', 'multiverse/l1_analysis/analyze.py', 'multiverse/analysis_pipeline.py', 'multiverse/functions.py', 'multiverse/preprocessing/preprocess.py', 'multiverse/configuration/multiverse.sh', 'multiverse/l3_analysis/analyze.py', 'multiverse/preprocessing/workflows.py', 'multiverse/preprocessing/functions.py', 'multiverse/gui/gui.py', '../../../../opt/anaconda3/lib/python3.8/site-packages/nipype/pipeline/plugins/ipython.py']
+recent_files = ['multiverse.py', 'multiverse/run_multiverse.py', 'hide/old/unit_testing.py', 'multiverse/plugins_base.py', 'multiverse/l1_analysis/analyze.py', 'multiverse/analysis_pipeline.py', 'multiverse/functions.py', 'multiverse/preprocessing/preprocess.py', 'multiverse/configuration/multiverse.sh', 'multiverse/l3_analysis/analyze.py', 'multiverse/preprocessing/workflows.py', 'multiverse/preprocessing/functions.py', 'multiverse/gui/gui.py', '../../../../opt/anaconda3/lib/python3.8/site-packages/nipype/pipeline/plugins/ipython.py', 'multiverse/l1_analysis/workflows.py', 'multiverse/l1_analysis/functions.py', 'multiverse/legacy/susan.py']
 
