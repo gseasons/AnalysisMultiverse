@@ -169,7 +169,7 @@ def on_pop_gen(ga):
         #PROBABLY CHANGE SO THAT BATCH ONLY COMES INTO PLAY IF RUNNING MULTIPROC OR SLURM
         gb_per_pipe = len(subjects) * (len(sessions) + 1) * (len(runs) + 1) * 0.83
         
-        batch_size = config['batches']
+        batch_size = config.get('batches', pop_.shape[0])
         iterations = math.ceil(pop_.shape[0] / batch_size)
         
         if (config['storage'] / gb_per_pipe) < pop_.shape[0]:
