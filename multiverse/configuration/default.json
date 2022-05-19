@@ -6,7 +6,7 @@
             "params": [
                 {
                     "on_off": "on",
-                    "alias": "Kernel size (in voxels)",
+                    "alias": "Kernel size (in mm)",
                     "name": "kernel_size",
                     "value": [0, 4, 8],
                     "default": 0
@@ -92,7 +92,7 @@
             "params": [
                 {
                     "on_off": "on",
-                    "alias": "Kernel Size (in voxels)",
+                    "alias": "Kernel Size (in mm)",
                     "name": "kernel_size",
                     "value": [0, 4, 8],
                     "default": 0
@@ -259,7 +259,7 @@
                 },
                 {
                     "on_off": "on",
-                    "alias": "Kernel smoothing FWHM (voxels)",
+                    "alias": "Kernel smoothing FWHM (mm)",
                     "name": "fwhm",
                     "value": [3, 4, 5, 6, 7, 8, 9, 10, 12],
                     "default": 2
