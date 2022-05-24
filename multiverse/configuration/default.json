@@ -483,11 +483,11 @@
             "node_name": "flameo",
             "params": [
                 {
-                    "on_off": "on",
+                    "on_off": "off",
                     "alias": "Mode",
                     "name": "run_mode",
                     "value_map": ["fe", "ols", "flame1", "flame12"],
-                    "default": 2
+                    "default": 0
                 },
                 {
                     "on_off": "off",

@@ -121,7 +121,7 @@ class level1(spatial_normalization):
                       (correction, contrasts, [('session_info', 'session_info')]),
                       (correction, l1d, [('session_info', 'session_info')]),
                       (contrasts, l1d, [('contrasts', 'contrasts')]),
-                      (l1d, editfsf, [('fsf_files', 'fsf_file')]),
+                      (l1d, editfsf, [('fsf_files', 'design')]),
                       (Finfo, editfsf, [('highpass', 'highpass')]),
                       (editfsf, feat, [('fsf_file', 'fsf_file')]),
                       ])
