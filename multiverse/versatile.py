@@ -800,6 +800,8 @@ class Level1DesignVersatile(BaseInterface):
                         ev_parameters["temporalderiv"] = int(
                             bool(ev_parameters.get("derivs", False))
                         )
+                        #Resting state doesn't use temporal derivative
+                        ev_parameters["temporalderiv"] = 0
                         #Don't convolve if resting state
                         ev_txt += ev_none.substitute(ev_parameters)
                         if ev_parameters["temporalderiv"]:

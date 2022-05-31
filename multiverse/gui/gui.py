@@ -28,11 +28,14 @@ class AutoScrollbar(tk.Scrollbar):
 
 class MultiverseConfig():
     def __init__(self, rerun, data_dir="N/A", output="N/A"):
+        if data_dir == None:
+            data_dir = "N/A"
+        if output == None:
+            output = "N/A"
         self.data_dir = data_dir
         self.output = output
         self.master = tk.Tk()
         self.master.geometry("900x550")
-        
         self.main_set_butt = {'state': 'deactivate'}
         
         self.vscroll = AutoScrollbar(self.master)
