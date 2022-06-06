@@ -81,7 +81,7 @@ def main():
 #         volumes = ['{code}:/multiverse/code'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
 #                    '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir)]
 # =============================================================================
-        volumes = ['{code}:/multiverse/code'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
+        volumes = ['{code}:/code/multiverse'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
                    '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir),
                    '{code}/templateflow:/home/multiverse/.cache/templateflow'.format(code=code_dir)]
         if process_mode != 'SLURM':
