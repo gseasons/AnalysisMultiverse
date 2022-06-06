@@ -12,7 +12,7 @@ if [ ! -f $container ]; then
     exit
 fi
 
-singularity exec -B $1:/scratch -B ~/multiverse:/code/multiverse $container /bin/bash -c "source activate multiverse; export USER=$USER ; python /code/multiverse/run_multiverse.py ${3}"
+singularity exec -B $2:/scratch -B ~/multiverse:/code/multiverse -B $1:/data $container /bin/bash -c "source activate multiverse; export USER=$USER ; python /code/multiverse/run_multiverse.py ${3}"
 
 for filename in $reproducibility/*_workflow_*.pkl; do
     [[ $filename =~ ^.*/(.*)_workflow_(.*).pkl ]] && task=${BASH_REMATCH[1]} && batch=${BASH_REMATCH[2]}

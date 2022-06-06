@@ -9,7 +9,8 @@ import subprocess
 import argparse, sys, os, json, pickle, re
 from multiverse.gui.gui import MultiverseConfig
 from os.path import join as opj
-import numpy as np
+#import numpy as np
+from math import ceil
 
 dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -94,7 +95,7 @@ def main():
                 print('Running Container')
                 container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes, user='root')
                 container.start()
-                container.exec_run('sudo /bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py {0}"'.format(args.rerun))
+                container.exec_run('sudo /bin/bash -c "source activate multiverse ; python /code/multiverse/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
                 container.remove()
                 client.volumes.prune()
@@ -106,7 +107,7 @@ def main():
                     
                 container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes)
                 container.start()
-                container.exec_run('/bin/bash -c "source activate multiverse ; python /multiverse/code/run_multiverse.py {0}"'.format(args.rerun))
+                container.exec_run('/bin/bash -c "source activate multiverse ; python /code/multiverse/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
                 container.remove()
                 client.volumes.prune()
@@ -130,7 +131,7 @@ def main():
                         time_s += int(sp) * 60
                     else:
                         time_s += int(sp)
-                time_s = time_s / config['pipelines'] * np.ceil(int(config['cpu_node']) / 4).astype(int)
+                time_s = time_s / config['pipelines'] * int(ceil(int(config['cpu_node']) / 4))
                 
                 days = int(time_s / (24 * 3600))
                 hours = max(int(time_s / 3600) - days * 24, 0)
@@ -138,8 +139,8 @@ def main():
                 seconds = max(int(time_s) - days * 24 * 3600 - hours * 3600 - minutes * 60, 0)
                 
                 config['time'] =  str(days) + '-' + str(hours) + ':' + str(minutes) + ':' + str(seconds)
-                config['mem'] = np.ceil(float(config['mem']) * int(config['cpu_node'])).astype(int).astype(str)
-                config['batches'] = np.ceil(int(config['cpu_node']) / 4).astype(int)
+                config['mem'] = str(int(ceil(float(config['mem']) * int(config['cpu_node'])))) + "G"
+                config['batches'] = int(ceil(int(config['cpu_node']) / 4))
                 
                 subprocess.call(['{0}/configuration/intermediate.sh'.format(code_dir), args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']])
             else:

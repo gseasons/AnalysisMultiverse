@@ -154,8 +154,8 @@ def on_pop_gen(ga):
         runs = layout.get_runs(task=task)
         
         os.makedirs(out_dir + '/reproducibility/' + task + '/configuration/', exist_ok=True)
-        shutil.copyfile('/multiverse/code/configuration/multiverse_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/multiverse_configuration.pkl')
-        shutil.copyfile('/multiverse/code/configuration/general_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/general_configuration.pkl')
+        shutil.copyfile('/code/multiverse/configuration/multiverse_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/multiverse_configuration.pkl')
+        shutil.copyfile('/code/multiverse/configuration/general_configuration.pkl', out_dir + '/reproducibility/' + task + '/configuration/general_configuration.pkl')
         
         if sessions or runs:
             multiscan = True

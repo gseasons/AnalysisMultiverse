@@ -5,6 +5,7 @@ Created on Tue Oct 26 12:47:09 2021
 
 @author: grahamseasons
 """
+#MODIFIED FROM:
 def FDR(copes, varcopes, dof, mask, cor):
     from correction.functions import fdr, ztop
     from nipype import MapNode, Function

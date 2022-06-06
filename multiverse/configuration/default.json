@@ -221,21 +221,21 @@
                     "alias": "Global signal",
                     "name": "GLOBAL",
                     "value_map": [false, true],
-                    "default": 1
+                    "default": 0
                 },
                 {
                     "on_off": "on",
                     "alias": "Normalize data",
                     "name": "glm_dat_norm",
                     "value_map": [false, true],
-                    "default": 1
+                    "default": 0
                 },
                 {
                     "on_off": "on",
                     "alias": "Demean data",
                     "name": "glm_demean",
                     "value_map": [false, true],
-                    "default": 1
+                    "default": 0
                 },
                 {
                     "on_off": "on",
