@@ -15,6 +15,9 @@ Software for automated multiverse analysis for fMRI
   5. Recent update works by submitting multiple partial jobs (i.e. 25 jobs for 200 pipelines -> 25 nodes with 32 cpus, for 8 pipelines) instead of 1 massive job
     a. Calculates runtime for each job by subdividing total given runtime (for 1 massive job) by the number of subjobs
     b. If using split_half (still in development/untested), remains as 1 large job, as generations act as batches, and are dependent on each other
+    
+# GUI Note
+- When setting a parameter with a range (i.e. low, high, step) the default behaviour is [low, high), unless a step is included in which case it will be [low, high] incremented by the step value
   
 # Node Naming Conventions/Multiverse Modification
 - To add more parameters to multiverse analysis, edit the default.json file in configuration

@@ -24,7 +24,7 @@ def get_wm(files):
 
 def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
     """Ability to turn on/off slice timing correction as well as select median volume if not corrected to mean"""
-    from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT, ImageStats
+    from nipype.interfaces.fsl import Threshold, ExtractROI, FLIRT, ImageStats, UnaryMaths
     import nibabel as nib
     import os, re
     from shutil import copy2
@@ -37,6 +37,8 @@ def decision(mask, mc_mean, mc, st, slice_correct='', mean_vol=''):
         mean_vol = copy2(mean_vol, os.path.join(os.getcwd(), new_name))
         
     mask = Threshold(in_file=mask, thresh=0, args='-bin').run().outputs.out_file
+    mask = UnaryMaths(in_file=mask, operation='fillh').run().outputs.out_file
+    
     if mc_mean and slice_correct:
         if resample:
             mask = FLIRT(in_file=mask, reference=mean_vol, apply_xfm=True, uses_qform=True, interp='nearestneighbour').run().outputs.out_file

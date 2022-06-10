@@ -43,4 +43,4 @@ JOB_CHECK=$(sq)
 #if templateflow breaks
 singularity exec -H $2:/scratch -e -B ~/multiverse/plugins_base.py:$custom_base -B ~/multiverse/templateflow:/scratch/.cache/templateflow -B ~/.ipython:/scratch/.ipython -B ~/multiverse:/code/multiverse -B $1:/data \
 $container /bin/bash -c \
-"source activate multiverse ; export USER=$USER ; python /code/multiverse/batch_multiverse_processing.py ${4} ${JOB_CHECK}"
+"source activate multiverse ; export USER=$USER ; python /code/multiverse/batch_multiverse_processing.py ${4} '${JOB_CHECK}'"

@@ -39,6 +39,8 @@ def smooth(warped, mask):
     #WORKFLOW ADAPTED FROM: https://nipype.readthedocs.io/en/latest/users/examples/fmri_fsl.html
     from nipype.interfaces.base import Undefined
     from nipype.interfaces.fsl import (ImageMaths, ImageStats, SUSAN, IsotropicSmooth)
+    import numpy as np
+    import math
     import os, glob, re
     from preprocessing.functions import get_bright_thresh, getthreshop
     #FROM: https://github.com/nipy/nipype/blob/6d8efd74f7f019298c00f5486db479fef5657561/nipype/workflows/fmri/fsl/preprocess.py
@@ -47,28 +49,35 @@ def smooth(warped, mask):
     susan = vars().get('susan', True)
     fwhm = vars().get('fwhm', 6)
     
-    if susan:
-        smoothed = create_susan_smooth()
-        smoothed.inputs.inputnode.in_files = warped
-        smoothed.inputs.inputnode.mask_file = mask
-        smoothed.inputs.inputnode.fwhm = fwhm
-        smoothed.base_dir = os.getcwd()
-        smoothed.run()
-# =============================================================================
-#         maskfunc = ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask, in_file=warped).run().outputs.out_file
-#         getthresh = ImageStats(op_string='-p 2 -p 98', in_file=maskfunc).run().outputs.out_stat
-#         getthreshop_ = getthreshop(getthresh)
-#         threshold = ImageMaths(out_data_type='char', suffix='_thresh', in_file=maskfunc, op_string=getthreshop_).run().outputs.out_file
-#         
-#         medianval = ImageStats(op_string='-k %s -p 50', in_file=warped, mask_file=threshold).run().outputs.out_stat
-#         
-#         brightthresh = get_bright_thresh(medianval)
-#         
-#         smoothed = SUSAN(fwhm=fwhm, brightness_threshold=brightthresh, in_file=warped).run().outputs.smoothed_file
-# =============================================================================
-        smoothed = glob.glob(os.getcwd() + '/susan_smooth/smooth/**/**/**_smooth.nii.gz')[0]
+    if fwhm:
+        if susan:
+            smoothed = create_susan_smooth()
+            smoothed.inputs.inputnode.in_files = warped
+            smoothed.inputs.inputnode.mask_file = mask
+            smoothed.inputs.inputnode.fwhm = fwhm
+            smoothed.base_dir = os.getcwd()
+            smoothed.run()
+    # =============================================================================
+    #         maskfunc = ImageMaths(suffix='_bet', op_string='-mas', in_file2=mask, in_file=warped).run().outputs.out_file
+    #         getthresh = ImageStats(op_string='-p 2 -p 98', in_file=maskfunc).run().outputs.out_stat
+    #         getthreshop_ = getthreshop(getthresh)
+    #         threshold = ImageMaths(out_data_type='char', suffix='_thresh', in_file=maskfunc, op_string=getthreshop_).run().outputs.out_file
+    #         
+    #         medianval = ImageStats(op_string='-k %s -p 50', in_file=warped, mask_file=threshold).run().outputs.out_stat
+    #         
+    #         brightthresh = get_bright_thresh(medianval)
+    #         
+    #         smoothed = SUSAN(fwhm=fwhm, brightness_threshold=brightthresh, in_file=warped).run().outputs.smoothed_file
+    # =============================================================================
+            smoothed = glob.glob(os.getcwd() + '/susan_smooth/smooth/**/**/**_smooth.nii.gz')[0]
+        else:
+            smoothed = IsotropicSmooth(fwhm=fwhm, in_file=warped, output_type='NIFTI_GZ').run().outputs.out_file
     else:
-        smoothed = IsotropicSmooth(fwhm=fwhm, in_file=warped, output_type='NIFTI').run().outputs.out_file
+        smoothed = warped
+        
+    result = ImageStats(in_file=smoothed, op_string='-R').run().outputs.out_stat
+    if np.isnan(result):
+        raise ValueError("NaN values detected in regressed image (preprocessing - workflows - regress")
         
     return smoothed
          
@@ -200,9 +209,12 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
         glm = GLM(design=name_ + '.mat', in_file=unsmoothed, out_res_name=out_name)
     
         regressed = glm.run().outputs.out_res
-        add = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0]
+        result = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat
+        add = result[0]
         if add < 0:
             add = abs(add)
+        elif True in np.isnan(result):
+            raise ValueError("NaN values detected in regressed image (preprocessing - workflows - regress")
         else:
             add = 0
         unsmoothed = ImageMaths(in_file=regressed, args='-add {0}'.format(add)).run().outputs.out_file
@@ -213,9 +225,12 @@ def regress(unsmoothed, mc_par, segmentations, mask, rest):
         glm = GLM(design=name_reho + '.mat', in_file=forreho, out_res_name=out_name)
 
         regressed = glm.run().outputs.out_res
-        add = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat[0]
+        result = ImageStats(in_file=regressed, op_string='-R').run().outputs.out_stat
+        add = result[0]
         if add < 0:
             add = abs(add)
+        elif True in np.isnan(result):
+            raise ValueError("NaN values detected in regressed image (preprocessing - workflows - regress")
         else:
             add = 0
         forreho = ImageMaths(in_file=regressed, args='-add {0}'.format(add)).run().outputs.out_file

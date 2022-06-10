@@ -21,7 +21,8 @@ def editfsf(design, highpass):
             data = f.read()
             
         data = data.replace('set fmri(tsplot_yn) 1', 'set fmri(tsplot_yn) 0')
-        data = data.replace('set fmri(temphp_yn) 1', 'set fmri(temphp_yn) 0')
+        if highpass:
+            data = data.replace('set fmri(temphp_yn) 1', 'set fmri(temphp_yn) 0')
         
         with open(des, 'w') as f:
             f.write(data)

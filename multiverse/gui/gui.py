@@ -901,6 +901,7 @@ class MultiverseConfig():
             high = self.to_num(vars(self)[param_name_full+stage+'high'].get())
             step = self.to_num(vars(self)[param_name_full+stage+'step'].get())
             if step:
+                high += step
                 self.out_dic[stage][param_name_full]['gene'] = {'low': low, 'high': high, 'step': step}
                 updated = {'low': low, 'high': high, 'step': step}
             else:
