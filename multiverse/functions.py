@@ -696,7 +696,8 @@ def organize(task, out_frame):
                                 processed['constants'][key+'region'] = col[key][0][0]
                                 processed['constants'][key+'threshold'] = col[key][0][1]
                             else:
-                                processed['constants']['parameters'][key] = col[key]
+                                #processed['constants']['parameters'][key] = col[key]
+                                processed['constants'][key] = col[key]
                         else:
                             processed['constants'][key] = col[key]
                 else:
