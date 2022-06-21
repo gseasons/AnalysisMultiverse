@@ -272,7 +272,6 @@ def on_pop_gen(ga):
                         save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                         
                     
-                        
                     if batch == (iterations-1):
                         sys.exit()
                 else:

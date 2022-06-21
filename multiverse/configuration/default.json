@@ -28,7 +28,7 @@
                     "on_off": "on",
                     "alias": "Leading volumes to discard",
                     "name": "t_min",
-                    "value": [0, 4, 10],
+                    "value": [4, 10],
                     "default": 0
                 }
             ]
@@ -203,7 +203,7 @@
             "node_name": "Fregress",
             "params": [
                 {
-                    "on_off": "off",
+                    "on_off": "on",
                     "alias": "Cerebrospinal fluid signal",
                     "name": "CSF",
                     "value_map": [false, true],
@@ -261,8 +261,8 @@
                     "on_off": "on",
                     "alias": "Kernel smoothing FWHM (mm)",
                     "name": "fwhm",
-                    "value": [3, 4, 5, 6, 7, 8, 9, 10, 12],
-                    "default": 2
+                    "value": [0, 2, 4, 6, 8],
+                    "default": 3
                 }
             ]
         }
@@ -547,7 +547,7 @@
                     "default": 2
                 },
                 {
-                    "on_off": "off",
+                    "on_off": "on",
                     "alias": "Cluster connectivity",
                     "name": "cor_connectivity",
                     "value": [6, 18, 26],
