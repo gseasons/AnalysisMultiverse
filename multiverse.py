@@ -11,6 +11,7 @@ from multiverse.gui.gui import MultiverseConfig
 from os.path import join as opj
 #import numpy as np
 from math import ceil
+import time
 
 dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -90,7 +91,19 @@ def main():
             except:
                 subprocess.call(['pip', 'install', 'docker'])
                 import docker
-            client = docker.from_env()
+            try:
+                client = docker.from_env()
+            except:
+                subprocess.call(['open', '-a', 'Docker'])
+                sleeping = 0
+                while not subprocess.call(['! docker info > /dev/null 2>&1'], shell=True) and sleeping < 30:
+                    time.sleep(1)
+                    sleeping += 1
+                
+                if sleeping == 30:
+                    print('Could not open Docker Desktop, please ensure it is installed and try again.')
+                    exit()
+                
             try:
                 print('Running Container')
                 container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes, user='root')
