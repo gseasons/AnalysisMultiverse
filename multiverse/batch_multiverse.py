@@ -19,7 +19,10 @@ if len(sys.argv) > 3:
     task = sys.argv[2]
     profile = sys.argv[3]
     
-save_dir = processed + '/checkpoints_' + task + '_batch_' + str(batch)
+save_dir = processed + '/reproducibility/checkpoints_' + task + '_batch_' + str(batch)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir, exist_ok=True)
+    
 config.set("execution", "crashdump_dir", save_dir)
     
 working_dir = '/scratch/{task}_working_dir_{batch}'.format(task=task, batch=batch)

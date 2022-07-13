@@ -1,3 +1,5 @@
+TODO: FIX CHECKPOINTS/MAKE CONSISTENT
+
 # AnalysisMultiverse
 Software for automated multiverse analysis for fMRI
 

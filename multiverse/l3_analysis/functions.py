@@ -59,7 +59,7 @@ def t_test(covariate, subjects, demean):
             groupcat = categories[0]
             
         #ASSUMES unpaired t-test
-        #THIS IS EXPECTING STRING CATEGORIES FOR GROUPS -> could probably eliminate need with inclusing of json file
+        #THIS IS EXPECTING STRING CATEGORIES FOR GROUPS -> could probably eliminate need with inclusion of json file
         group = covariates.groupby(groupcat)
         num_groups = len(group.count())
         group_ids = (group.ngroup() + 1).to_list()
