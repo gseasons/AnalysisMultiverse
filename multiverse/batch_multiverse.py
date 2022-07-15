@@ -24,6 +24,12 @@ if not os.path.exists(save_dir):
     os.makedirs(save_dir, exist_ok=True)
     
 config.set("execution", "crashdump_dir", save_dir)
+
+with open('/code/multiverse/configuration/general_configuration.pkl', 'rb') as f:
+    configuration = pickle.load(f)
+
+if not configuration['debug']:
+    config.set("execution", "remove_node_directories", "true")
     
 working_dir = '/scratch/{task}_working_dir_{batch}'.format(task=task, batch=batch)
 
@@ -32,8 +38,6 @@ with open(processed + '/reproducibility/' + task + '_workflow_' + batch + '.pkl'
     
 workflow.run(plugin='IPython', plugin_args={'profile': profile, 'task': task, 'batch': batch})
 
-with open('/code/multiverse/configuration/general_configuration.pkl', 'rb') as f:
-    configuration = pickle.load(f)
 
 if os.path.exists(save_dir) and not glob.glob(save_dir + '/crash-*'):
     os.rename(save_dir, save_dir + '_done')
