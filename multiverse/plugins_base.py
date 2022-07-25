@@ -161,8 +161,11 @@ class DistributedPluginBase(PluginBase):
                         
                         if os.path.exists(outdir):
                             shutil.rmtree(outdir)                        
-                            
-                saved_state['_taskid'] = saved_state['pending_tasks'][-1][0] - 1
+                
+                try:
+                    saved_state['_taskid'] = saved_state['pending_tasks'][-1][0] - 1
+                except:
+                    saved_state['_taskid'] = saved_state['_taskid']
                 saved_state['_taskid']
                 saved_state.pop('pending_tasks')
             else:
