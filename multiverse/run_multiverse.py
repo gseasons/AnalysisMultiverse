@@ -268,6 +268,9 @@ def on_pop_gen(ga):
                     if os.path.exists(save_dir + '_done') and config['rerun']:
                         wf_path = save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                         shutil.rmtree(wf_path)
+                    elif config['rerun'] and os.path.exists(save_dir) and glob.glob(save_dir + '/crash-*'):
+                        for crash in glob.glob(save_dir + '/crash-*'):
+                            os.remove(crash)
                     else:
                         save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
                         
