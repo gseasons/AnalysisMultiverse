@@ -28,41 +28,47 @@ class AutoScrollbar(tk.Scrollbar):
 
 class MultiverseConfig():
     def __init__(self, rerun, data_dir="N/A", output="N/A"):
-        if data_dir == None:
-            data_dir = "N/A"
-        if output == None:
-            output = "N/A"
+        # Not necessary
+        # if data_dir == None:
+        #     data_dir = "N/A"
+        # if output == None:
+        #     output = "N/A"
         self.data_dir = data_dir
         self.output = output
+        # Master window initiated
         self.master = tk.Tk()
+        # Window Size
         self.master.geometry("900x550")
         self.main_set_butt = {'state': 'deactivate'}
         
+        # Scroll bar
         self.vscroll = AutoScrollbar(self.master)
         self.vscroll.grid(row=0, column=1, sticky='ns')
         self.canvas = tk.Canvas(self.master, yscrollcommand=self.vscroll.set)
-        self.canvas.grid(row=0, column=0, sticky='nsew')
+        self.canvas.grid(row=0, column=0, sticky='nsew')  # Resizes canvas automatically based on window size
         self.canvas.rowconfigure(0, weight=1)
         self.vscroll.config(command=self.canvas.yview)
         self.master.grid_rowconfigure(0, weight=1)
         self.master.grid_columnconfigure(0, weight=1)
         
-        self.out_dic = {}
+        self.out_dic = {}  # Output Dictionary
         self.configure = {'split_half': False, 'debug': False, 'rerun': rerun}
         
-        self.tabcontrol = ttk.Notebook(self.canvas)
-        self.tab_main = ttk.Frame(self.tabcontrol)
-        self.tab_main.columnconfigure(0, weight=1)
+        self.tabcontrol = ttk.Notebook(self.canvas)  # Intiates the tab control that is child of canvas
+        self.tab_main = ttk.Frame(self.tabcontrol)  # Initiates the main tab that is child of tab control
+        self.tab_main.columnconfigure(0, weight=1)  # Makes the main tab resize with the window
         self.tabcontrol.add(self.tab_main, text='Essential')
         
         label_dic = {'preprocess': 'Preprocessing', 'level1': 'Level 1 Analysis', 'level2': 'Level 2 Analysis', 'level3': 'Level 3 Analysis', 'correction': 'Multiple Comparisons Correction'}
-        data = self.get_format()
-        for i, stage in enumerate(data):
+        data = self.get_format()  # Loads in the config json file
+        for i, stage in enumerate(data):  # Stages are the keys in the json file (preprocess, level1, level2, level3, correction)
             counter = 0
             self.out_dic[stage] = {}
+            # Creates new tab for each stage
             vars(self)['tab_'+stage] = ttk.Frame(self.tabcontrol)
             vars(self)['tab_'+stage].columnconfigure(0, weight=1)
             self.tabcontrol.add(vars(self)['tab_'+stage], text=label_dic[stage])
+            # Initializes the window for each stage
             vars(self)['tab_window_'+stage] = ttk.Frame(vars(self)['tab_'+stage])
             vars(self)['tab_window_'+stage].grid(row=0, column=0, sticky="nsew")
             vars(self)['tab_window_'+stage].columnconfigure(0, weight=1)
@@ -71,7 +77,8 @@ class MultiverseConfig():
                 if node['alias'] != 'link':
                     ttk.Label(vars(self)['tab_window_'+stage], text=node['alias'], font='Helvetica 12 bold').grid(row=counter)
                     counter += 1
-                    
+                
+                # Filling in the parameter(s) for each node into output dictionary
                 for param in node['params']:
                     param_name = param['name']
                     alias = param['alias']
@@ -80,10 +87,10 @@ class MultiverseConfig():
                     param_name_full = node_name + '_' + param_name
                     on_off = param['on_off']
                     
-                    if 'value' in param:
+                    if 'value' in param:  # No value map
                         value = param['value']
                         value_map = ''
-                    else:
+                    else:  # Value map provided
                         value_map = param['value_map']
                         value = list(range(len(value_map)))
                         
@@ -96,16 +103,16 @@ class MultiverseConfig():
                         
                     if 'show' in param:
                         if value_map:
-                            for i in value:
-                                self.out_dic[stage][param_name_full][i] = value_map[i]
+                            for j in value:
+                                self.out_dic[stage][param_name_full][j] = value_map[j]
                         continue
                         
-                    if value_map:
-                        for i in value:
-                            val = value_map[i]
+                    if value_map:  # If `value_map` is not empty, then it is a list, and value is a list of indices [0, 1, 2, ...]
+                        for j in value:
+                            val = value_map[j]
                             if type(val) == list:
                                 val = tuple(val)
-                            self.out_dic[stage][param_name_full][i] = val
+                            self.out_dic[stage][param_name_full][j] = val
                             
                         self.strings(stage, alias, default, value_map, param_name_full, value, butt_text, counter)
                     else:
@@ -131,6 +138,19 @@ class MultiverseConfig():
         self.canvas.yview_scroll(-1*event.delta, tk.UNITS)
     
     def essential(self):
+        """
+        This method is responsible for completing the initial configuration of settings in the GUI.
+        It creates and configures various widgets such as labels, checkbuttons, entry fields, buttons, etc.
+        It also binds event handlers to certain widgets for validation and functionality.
+        
+        Parameters:
+        - None
+
+        Returns:
+        - None
+        """
+        
+        # Complete the initial configuration of settings
         self.aesthetic_frame_main = ttk.Frame(self.tab_main)
         self.aesthetic_frame_main.grid(row=0, column=0, sticky="nsew")
         self.aesthetic_frame_main.columnconfigure(0, weight=1)
@@ -149,54 +169,65 @@ class MultiverseConfig():
         self.coords_check = tk.Checkbutton(self.main_config, text='User Defined ROI', variable=self.coords, command=self.allow)
         self.coords_check.grid(row=2, column=2)
         
+        # Number of networks
         ttk.Label(self.main_config, text='Number of networks:', font='Helvetica 12').grid(row=3)
         self.networks = tk.Entry(self.main_config)
         self.networks.insert(4, "1")
         self.networks.grid(row=3, column=1)
         self.networks.bind("<Key>", self.valid_networks)
         
+        # Define Seeds
         self.seedbutton = tk.Button(self.main_config, text='Define Seeds', command=self.define_seeds)
         self.seedbutton['state'] = 'disabled'
         self.seedbutton.grid(row=4, column=0)
         
+        # Number of pipelines
         ttk.Label(self.main_config, text='Number of pipelines:', font='Helvetica 12').grid(row=5)
         self.pipelines = tk.Entry(self.main_config)
         self.pipelines.insert(4, "50")
         self.pipelines.grid(row=5, column=1)
         self.pipelines.bind("<Key>", self.valid_pipelines)
         
+        # Genetic Algorithm
         ttk.Label(self.main_config, text='Genetic Algorithm:', font='Helvetica 12').grid(row=6)
         self.ga = tk.Button(self.main_config, text='Off', command=self.genetic_switch)
         self.ga.grid(row=6, column=1)
         
+        # Genetic Algorithm Configuration
         self.ga_config = tk.Button(self.main_config, text='Genetic Algorithm Config', command=self.genetic_config)
         self.ga_config['state'] = 'disabled'
         self.ga_config.grid(row=7, column=0)
         
+        # Split-Half Analysis
         ttk.Label(self.main_config, text='Split-Half Analysis:').grid(row=8)
         self.split = ttk.Label(self.main_config, text='Off')
         self.split.grid(row=8, column=1)
         
+        # Debug Mode
         ttk.Label(self.main_config, text='Debug mode (cached intermediates):').grid(row=9)
         self.debug_butt = ttk.Button(self.main_config, text='Off', command=self.debug)
         self.debug_butt.grid(row=9, column=1)
         
+        # Processing Mode
         ttk.Label(self.main_config, text='Processing mode (SLURM for compute cluster):').grid(row=10)
         self.process_mode_var = tk.StringVar()
         self.process_mode_var.set('MultiProc')
         self.parent_selection = tk.OptionMenu(self.main_config, self.process_mode_var, 'MultiProc', 'Linear', 'SLURM', command=self.slurm_block)
         self.parent_selection.grid(row=10, column=1)
         
+        # Maximum Output Storage
         ttk.Label(self.main_config, text='Maximum Output Storage (GB, ignored for debug mode):', font='Helvetica 12').grid(row=11)
         self.storage = tk.Entry(self.main_config)
         self.storage.insert(4, "20000")
         self.storage.grid(row=11, column=1)
         
+        # Data and Output Directories
         ttk.Label(self.main_config, text='Data directory:').grid(row=12)
         ttk.Label(self.main_config, text=self.data_dir).grid(row=12, column=1)
         ttk.Label(self.main_config, text='Output directory:').grid(row=13)
         ttk.Label(self.main_config, text=self.output).grid(row=13, column=1)
         
+        # Button Frame
         self.return_buttons = ttk.Frame(self.aesthetic_frame_main, relief='groove', padding='0.5i')
         self.return_buttons.grid(row=2)
         
@@ -262,6 +293,21 @@ class MultiverseConfig():
                 self.run_now['state'] = 'disabled'
                 
     def slurm_config(self):
+        """
+        Configures the SLURM settings for batch submission.
+
+        This method creates a frame and adds various input fields and labels for configuring SLURM settings.
+        The user can specify the SLURM account, number of CPUs, CPUs per node, pipelines per batch, memory required per CPU,
+        job time, and other settings.
+
+        Parameters:
+        - None
+
+        Returns:
+        - None
+        """
+        
+        # Creates a new frame for the SLURM settings
         self.slurm_frame_main = ttk.Frame(self.tab_main)
         self.slurm_frame_main.grid(row=0, column=0, sticky="nsew")
         self.slurm_frame_main.columnconfigure(0, weight=1)
@@ -271,33 +317,39 @@ class MultiverseConfig():
         self.slurm_frame.grid(row=1, column=0, sticky="nsew")
         self.slurm_frame.columnconfigure(0, weight=1)
         
+        # Entry for SLURM account
         ttk.Label(self.slurm_frame, text='SLURM account:').grid(row=1)
         self.account = ttk.Entry(self.slurm_frame)
         self.account.insert(4, 'def-')
         self.account.grid(row=1, column=1)
         
+        # Entry for number of CPUs
         ttk.Label(self.slurm_frame, text='Number of CPUs:').grid(row=2)
         self.cpus = ttk.Entry(self.slurm_frame)
         self.cpus.insert(4, self.pipelines.get())
         self.cpus.grid(row=2, column=1)
         
+        # Entry for CPUs per node
         ttk.Label(self.slurm_frame, text='CPUs per node (on compute cluster):').grid(row=3)
         self.nodes = ttk.Entry(self.slurm_frame)
         self.nodes.insert(4, '32')
         self.nodes.grid(row=3, column=1)
         
+        # Entry for pipelines per batch
         ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
         self.batches = ttk.Entry(self.slurm_frame)
         self.batches.insert(4, str(ceil(int(self.pipelines.get())/4)))
         self.batches.grid(row=4, column=1)
         
+        # Entry for memory required per CPU
         ttk.Label(self.slurm_frame, text='Memory required per CPU (GB):').grid(row=5)
         self.mem = ttk.Entry(self.slurm_frame)
         self.mem.insert(4, '6')
         self.mem.grid(row=5, column=1)
-        #NEED BETTER BENCHMARK
+        # NEED BETTER BENCHMARK
         ttk.Label(self.slurm_frame, text='Time ~2.4H * (subject,scan,pipeline) / CPUs').grid(row=6)
         
+        # Entry for job time
         ttk.Label(self.slurm_frame, text='Job time (Days-Hours:Mins):').grid(row=7)
         self.time = ttk.Entry(self.slurm_frame)
         self.time.insert(4, '0-00:00')
@@ -309,6 +361,16 @@ class MultiverseConfig():
         self.slurm_frame_main.tkraise()
         
     def set_slurm(self, auto):
+        """
+        Sets the SLURM configuration parameters based on user input from slurm_config.
+
+        Parameters:
+        - auto: A boolean indicating whether the configuration should be set automatically.
+
+        Returns:
+        None
+        """
+        
         node_request = int(self.cpus.get()) / int(self.nodes.get())
         self.configure['nodes'] = str(ceil(node_request))
         self.configure['ntasks'] = str(ceil(node_request) * int(self.nodes.get()))
@@ -320,7 +382,14 @@ class MultiverseConfig():
         
         self.aesthetic_frame_main.tkraise()
         
-    def done(self, run):
+    def done(self, run: bool):
+        """
+        Saves the configuration settings and exits the application.
+
+        Args:
+            run (bool): Indicates whether to resume the execution or not.
+        """
+        
         self.configure['processing'] = self.process_mode_var.get()
         self.configure['storage'] = float(self.storage.get())
         if 'pipelines' not in self.configure:
@@ -340,8 +409,11 @@ class MultiverseConfig():
         reformatted = self.format_out(self.out_dic)
         self.save(settings, reformatted)
         self.save(general, self.configure)
-        #RESUME MODE
+        # RESUME MODE
         self.run_now = run
+        
+        message = "Configuration settings have been saved. The application will now exit." if not run else "Configuration settings have been saved. The analysis will now begin."
+        tk.messagebox.showinfo('Configuration Saved', message)
         
         self.master.destroy()
         self.master.quit()
@@ -618,7 +690,7 @@ class MultiverseConfig():
                 raise ValueError('A brain region must be selected.')
             if atlas:
                 mini = vars(self)['atlas_min'+str(val)].get()
-                if re.search('[^a-zA-Z0-9\.]+', mini) or not mini:
+                if re.search('^\\d+$', mini) or not mini:
                     raise ValueError('Expected an integer, but {mini} was provided instead. Using 0'.format(mini=mini))
                     mini = 0
                 else:
@@ -632,7 +704,7 @@ class MultiverseConfig():
                         
                         
                 maxi = vars(self)['atlas_max'+str(val)].get()
-                if re.search('[^a-zA-Z0-9\.]+', maxi) or not maxi:
+                if re.search('^\\d+$', maxi) or not maxi:
                     raise ValueError('Expected an integer, but {maxi} was provided instead. Using 95'.format(maxi=maxi))
                     maxi = 95
                 else:
