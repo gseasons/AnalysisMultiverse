@@ -9,7 +9,7 @@ templates=/home/$USER/.cache/templateflow
 
 if [ ! -f $container ]; then
     singularity pull library://gseasons/analysis/multiverse \
-    || echo "Cannot access container, please upload the image into your home directory: https://cloud.sylabs.io/library/gseasons/multiverse/multiverse.sif"
+    || echo "Cannot access container, please upload the image into your home directory: https://cloud.sylabs.io/library/gseasons/analysis/multiverse.sif"
     exit
 fi
 
