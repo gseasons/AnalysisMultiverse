@@ -30,7 +30,7 @@ Software for automated multiverse analysis for fMRI
 
 - To add more parameters to multiverse analysis, edit the default.json file in configuration
   1. Find the specific node in the workflow, cross reference with changeable options for nipype interface
-  2. Add new entry in format seen in json file 
+  2. Add new entry in format seen in json file
     a. Non-numeric parameters need a value_map parameter to indicate it will be aliased in the genetic algorithm
     b. Default category indicates the index of the default value
     c. alias is what is displayed in GUI

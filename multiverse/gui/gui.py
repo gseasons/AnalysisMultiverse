@@ -10,6 +10,7 @@ from shutil import copy2
 import xml.etree.ElementTree as ET
 import json, pickle
 import tkinter as tk
+import tkinter.filedialog
 from tkinter import ttk
 from functools import partial
 from math import ceil
@@ -28,15 +29,15 @@ class AutoScrollbar(tk.Scrollbar):
 
 class MultiverseConfig():
     def __init__(self, rerun, data_dir="N/A", output="N/A"):
-        # Not necessary
-        # if data_dir == None:
-        #     data_dir = "N/A"
-        # if output == None:
-        #     output = "N/A"
+        if data_dir == None:
+            data_dir = "N/A"
+        if output == None:
+            output = "N/A"
         self.data_dir = data_dir
         self.output = output
         # Master window initiated
         self.master = tk.Tk()
+        self.master.title("Analysis Mulitverse")
         # Window Size
         self.master.geometry("900x550")
         self.main_set_butt = {'state': 'deactivate'}
@@ -607,9 +608,13 @@ class MultiverseConfig():
             vars(self)['define_network'+str(val)].grid(row=counter+val+1)
             for i, mode in enumerate(modes):
                 if mode:
+                    fsl = os.getenv('FSLDIR')
+                    # If FSL is not downloaded
+                    if fsl == None:
+                        raise FileNotFoundError("FSL is not downloaded. Download here: https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/index. After downloading reload your terminal/command prompt")
+                    
                     if i == 0:
                         vars(self)['atlas_dropdown'+str(val)] = []
-                        fsl = os.getenv('FSLDIR')
                         for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
                             tree = ET.parse(atlas)
                             root = tree.getroot()
@@ -651,7 +656,6 @@ class MultiverseConfig():
                         counter += 1
                     if i == 1:
                         vars(self)['atlas_dropdown'+str(val)] = []
-                        fsl = os.getenv('FSLDIR')
                         for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
                             tree = ET.parse(atlas)
                             root = tree.getroot()
