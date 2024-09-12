@@ -5,6 +5,7 @@ Software for automated multiverse analysis for fMRI
 ## TODO
 
 - FIX CHECKPOINTS/MAKE CONSISTENT
+- MAKE SURE CODE SHOULD STOP IF WRONG VALUE ENTERED INTO ATLAS GUI OR BE REPLACED BY DEFAULT
 
 ## Run Instructions
 
