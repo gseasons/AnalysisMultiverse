@@ -1,14 +1,15 @@
 #!/bin/bash
 
-module load singularity
+module load apptainer
 
-container=~/multiverse_latest.sif
+container=~/multiverse.sif
 custom_base=/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py
 #if templateflow breaks
 templates=/home/$USER/.cache/templateflow
 
 if [ ! -f $container ]; then
-    singularity pull library://gseasons/analysis/multiverse \
+    singularity build multiverse.sif docker://gseasons/multiverse:cluster \
+    #singularity pull library://gseasons/analysis/multiverse \
     || echo "Cannot access container, please upload the image into your home directory: https://cloud.sylabs.io/library/gseasons/multiverse/multiverse.sif"
     exit
 fi

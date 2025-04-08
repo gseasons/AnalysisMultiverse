@@ -285,10 +285,10 @@ class MultiverseConfig():
         self.nodes = ttk.Entry(self.slurm_frame)
         self.nodes.insert(4, '32')
         self.nodes.grid(row=3, column=1)
-        
-        ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
+        #Number of batches is initially calculated by number of pipelines, divided the number of cpus/node divided by 4 (heuristic, allows user to change)
+        ttk.Label(self.slurm_frame, text='Number of batches:').grid(row=4)
         self.batches = ttk.Entry(self.slurm_frame)
-        self.batches.insert(4, str(ceil(int(self.pipelines.get())/4)))
+        self.batches.insert(4, str(ceil(int(self.pipelines.get())/(int(self.nodes.get())/4))))
         self.batches.grid(row=4, column=1)
         
         ttk.Label(self.slurm_frame, text='Memory required per CPU (GB):').grid(row=5)
@@ -538,7 +538,13 @@ class MultiverseConfig():
                     if i == 0:
                         vars(self)['atlas_dropdown'+str(val)] = []
                         fsl = os.getenv('FSLDIR')
-                        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+                        
+                        if fsl:
+                            atlases = glob.glob(fsl + '/data/atlases/HarvardOxford*.xml')
+                        else:
+                            atlases = glob.glob(os.getcwd() + '/../multiverse/atlases/HarvardOxford*.xml')
+                            
+                        for atlas in atlases:
                             tree = ET.parse(atlas)
                             root = tree.getroot()
                         
@@ -580,7 +586,13 @@ class MultiverseConfig():
                     if i == 1:
                         vars(self)['atlas_dropdown'+str(val)] = []
                         fsl = os.getenv('FSLDIR')
-                        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+                        
+                        if fsl:
+                            atlases = glob.glob(fsl + '/data/atlases/HarvardOxford*.xml')
+                        else:
+                            atlases = glob.glob(os.getcwd() + '/../multiverse/atlases/HarvardOxford*.xml')
+                        
+                        for atlas in atlases:
                             tree = ET.parse(atlas)
                             root = tree.getroot()
                         
