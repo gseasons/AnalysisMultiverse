@@ -337,9 +337,10 @@ class MultiverseConfig():
         self.nodes.grid(row=3, column=1)
 
         # Entry for pipelines per batch
-        ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
+        # Number of batches is initially calculated by number of pipelines, divided the number of cpus/node divided by 4 (heuristic, allows user to change)
+        ttk.Label(self.slurm_frame, text='Number of batches:').grid(row=4) #ttk.Label(self.slurm_frame, text='Pipelines per batch:').grid(row=4)
         self.batches = ttk.Entry(self.slurm_frame)
-        self.batches.insert(4, str(ceil(int(self.pipelines.get())/4)))
+        self.batches.insert(4, str(ceil(int(self.pipelines.get())/(int(self.nodes.get())/4)))) #self.batches.insert(4, str(ceil(int(self.pipelines.get())/4)))
         self.batches.grid(row=4, column=1)
 
         # Entry for memory required per CPU
@@ -608,13 +609,18 @@ class MultiverseConfig():
             for i, mode in enumerate(modes):
                 if mode:
                     fsl = os.getenv('FSLDIR')
+                    
+                    if fsl:
+                        atlases = glob.glob(fsl + '/data/atlases/HarvardOxford*.xml')
+                    else:
+                        atlases = glob.glob(os.getcwd() + '/../multiverse/atlases/HarvardOxford*.xml')
                     # If FSL is not downloaded
-                    if fsl == None:
-                        raise FileNotFoundError("FSL is not downloaded. Download here: https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/index. After downloading reload your terminal/command prompt")
+                    #if fsl == None:
+                    #    raise FileNotFoundError("FSL is not downloaded. Download here: https://fsl.fmrib.ox.ac.uk/fsl/docs/#/install/index. After downloading reload your terminal/command prompt")
 
                     if i == 0:
                         vars(self)['atlas_dropdown'+str(val)] = []
-                        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+                        for atlas in atlases:
                             tree = ET.parse(atlas)
                             root = tree.getroot()
 
@@ -655,7 +661,7 @@ class MultiverseConfig():
                         counter += 1
                     if i == 1:
                         vars(self)['atlas_dropdown'+str(val)] = []
-                        for atlas in glob.glob(fsl + '/data/atlases/HarvardOxford*.xml'):
+                        for atlas in atlases:
                             tree = ET.parse(atlas)
                             root = tree.getroot()
 

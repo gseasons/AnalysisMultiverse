@@ -4,7 +4,8 @@ Software for automated multiverse analysis for fMRI
 
 ## TODO
 
-- FIX CHECKPOINTS/MAKE CONSISTENT
+- FIX CHECKPOINTS/MAKE CONSISTENT. For clarity, this means that if a run fails, restarting with rerun set to True should use the last generated checkpoint_crash file. Double check that setting DEBUG to FALSE will allow program to be rerun from wherever it last left off (but this should be the default functionality). Check that rerun in debug mode doens't start from the beginning, I think default behaviour might cause software to regenerate the directed graph of pipelines, and go node by node, instead of skipping to where it left off. Double check what rerun behaviour accomplishes with small sample/few pipelines
+- Enable running the program in 2 steps -> Initially lower resources are needed to generate the directed graph (can only use 1 CPU), but once analysis actually starts need increased CPUs and memory. Default function should be to initially run program to generate graph, create a checkpoint file, and then automatically rerun with the typical increased resources (this may only apply if not running in batches).
 - MAKE SURE CODE SHOULD STOP IF WRONG VALUE ENTERED INTO ATLAS GUI OR BE REPLACED BY DEFAULT
 
 ## Run Instructions
@@ -67,4 +68,5 @@ Software for automated multiverse analysis for fMRI
 - Generates a lot of data, peaking at ~0.83GB per subject per pipeline
    a. Running with debug set to false will delete files once they are no longer needed by the workflow
      i. Saves a LOT of space, but if the analysis fails, it cannot be rerun from where it failed, and will restart from the beginning (i.e. progress is lost)
-     ii. As a consequence, give a buffer when requesting run time, as computation time will be wasted if program fails prior to exiting
+     ii. I think above may not be true, as only deletes intermediate files when they are no longer needed, so should be able to rerun/restart from checkpoint with debug on
+     iii. As a consequence, give a buffer when requesting run time, as computation time will be wasted if program fails prior to exiting
