@@ -13,9 +13,9 @@ Software for automated multiverse analysis for fMRI
 - Launch Terminal
   1. For local run 'python /PATH/TO/MULTIVERSE.PY/multiverse.py -r -d /PATH/TO/BIDS_DATA -o /PATH/TO/OUTPUT_FOLDER'
   2. For cluster run 'python /PATH/TO/MULTIVERSE.PY/multiverse.py -c'
-      *a. Configure desired settings and parameter space for the cluster (select SLURM for running mode)
-      *b. After configuration copy files and directories (excluding updated, hide) to compute cluster
-      *c. Run step 1
+      - a. Configure desired settings and parameter space for the cluster (select SLURM for running mode)
+      - b. After configuration copy files and directories (excluding updated, hide) to compute cluster
+      - c. Run step 1
   3. To rerun an analysis using the same pipelines as a prior run: 'python /PATH/TO/MULTIVERSE.PY/multiverse.py -r -rr -d /PATH/TO/BIDS_DATA -o /PATH/TO/OUTPUT_FOLDER'
       *a. This requires the output directory to contain the reproducibility directory (including generation files) of the analysis to reproduce
       *b. Similarly, the files multiverse/configuration/general_configuration.pkl and multiverse/configuration/multiverse_configuration.pkl should be the same as the analysis to be reproduced
