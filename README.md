@@ -56,17 +56,17 @@ Software for automated multiverse analysis for fMRI
 ## Adding Additional FEAT Options
 
 - To add more options to the first level FEAT analysis, the template file: nipype/interfaces/fsl/model_templates/feat_ev_none.tcl can be edited
-   a. This will also require editing versatile.py lines 784 to 808 so that values can be added to the template file
-     i. In addition, SpecifyModelVersatile will need to be altered so that the produced dictionary will include the altered parameters added to the template file
-     ii. Then, the workflow "info" for level1 will need to be updated so that the new parameters will be added to SpecifyModelVersatile
-     iii. Finally, changes to the default.json file will need to be made to add new parameters
+   1. This will also require editing versatile.py lines 784 to 808 so that values can be added to the template file
+     a. In addition, SpecifyModelVersatile will need to be altered so that the produced dictionary will include the altered parameters added to the template file
+     b. Then, the workflow "info" for level1 will need to be updated so that the new parameters will be added to SpecifyModelVersatile
+     c. Finally, changes to the default.json file will need to be made to add new parameters
 
 ## Resource Allocation
 
 - On compute canada ~1.2 days for 50 subjects x 8 pipelines with 32 CPUs, 6gb RAM per CPU
 - Potential issue: There is a file cap on compute canada of 1000k (Graham), which may result in workflow crashing (likely need to get this extended)
 - Generates a lot of data, peaking at ~0.83GB per subject per pipeline
-   a. Running with debug set to false will delete files once they are no longer needed by the workflow
-     i. Saves a LOT of space, but if the analysis fails, it cannot be rerun from where it failed, and will restart from the beginning (i.e. progress is lost)
-     ii. I think above may not be true, as only deletes intermediate files when they are no longer needed, so should be able to rerun/restart from checkpoint with debug on
-     iii. As a consequence, give a buffer when requesting run time, as computation time will be wasted if program fails prior to exiting
+   1. Running with debug set to false will delete files once they are no longer needed by the workflow
+     a. Saves a LOT of space, but if the analysis fails, it cannot be rerun from where it failed, and will restart from the beginning (i.e. progress is lost)
+     b. I think above may not be true, as only deletes intermediate files when they are no longer needed, so should be able to rerun/restart from checkpoint with debug on
+     c. As a consequence, give a buffer when requesting run time, as computation time will be wasted if program fails prior to exiting
