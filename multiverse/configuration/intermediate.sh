@@ -1,13 +1,14 @@
 #!/bin/bash
-module load singularity
+module load apptainer
 
-container=~/multiverse_latest.sif
+container=~/multiverse.sif
 batch_sh=~/multiverse/configuration/batch.sh
 reproducibility=$2/processed/reproducibility
 
 
 if [ ! -f $container ]; then
-    singularity pull library://gseasons/analysis/multiverse \
+    singularity build multiverse.sif docker://gseasons/multiverse:cluster \
+    #singularity pull library://gseasons/analysis/multiverse \
     || echo "Cannot access container, please upload the image into your home directory: https://cloud.sylabs.io/library/gseasons/multiverse/multiverse.sif"
     exit
 fi

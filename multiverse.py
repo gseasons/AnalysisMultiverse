@@ -144,7 +144,7 @@ def main():
                         time_s += int(sp) * 60
                     else:
                         time_s += int(sp)
-                time_s = time_s / config['pipelines'] * int(ceil(int(config['cpu_node']) / 4))
+                time_s = time_s / (config['batches'] * config['cpu_node']) #(config['pipelines'] * int(ceil(int(config['cpu_node']) / 4))) #(config['pipelines'] * int(ceil(int(config['cpu_node']) / 4)))
                 
                 days = int(time_s / (24 * 3600))
                 hours = max(int(time_s / 3600) - days * 24, 0)
@@ -153,7 +153,7 @@ def main():
                 
                 config['time'] =  str(days) + '-' + str(hours) + ':' + str(minutes) + ':' + str(seconds)
                 config['mem'] = str(int(ceil(float(config['mem']) * int(config['cpu_node'])))) + "G"
-                config['batches'] = int(ceil(int(config['cpu_node']) / 4))
+                #config['batches'] = int(ceil(int(config['cpu_node']) / 4))
                 
                 subprocess.call(['{0}/configuration/intermediate.sh'.format(code_dir), args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']])
             else:
