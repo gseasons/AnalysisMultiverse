@@ -26,7 +26,8 @@ import shutil
 from nipype.utils.profiler import log_nodes_cb
 #TO DO: COMMENTS (especially GUI), CONTRIBUTE PLUGIN_BASE FILE (ALLOWS FOR DELETING USED NODES, IS SAFE FOR IDENTITY)
 
-exp_dir = '/scratch'
+
+exp_dir = '/scratch_dir'
 working_dir = 'working_dir'
 data_dir = '/data'
 out_dir = exp_dir + '/processed'
@@ -83,6 +84,7 @@ if not config['debug']:
     
 if sys.argv[1] == "True":
     config['rerun'] = True
+
 else:
     config['rerun'] = False
     
@@ -96,7 +98,9 @@ solution_start = 0
 layout = BIDSLayout(data_dir)
 tasks = layout.get_tasks()
 
-def check_pipes():
+
+
+def check_pipes(): 
     unique = []
     for task in tasks:
         try:
@@ -110,6 +114,7 @@ def check_pipes():
     else:
         return
 
+        
 def fitness_func(solution, solution_idx):
     if config['split_half']:
         avg = []
@@ -131,11 +136,10 @@ def on_pop_gen(ga):
     
     if check_pipes():
         return "stop"
-    
-    checkpoints = glob.glob('/scratch/processed/reproducibility/checkpoints/checkpoint_*.pkl')
-    
-    if config['rerun'] or checkpoints:
-        generation = glob.glob('/scratch/processed/reproducibility/generation_*.pkl')
+        
+
+    if config['rerun']:
+        generation = glob.glob('/scratch_dir/processed/reproducibility/generation_*.pkl')
         generation = len(generation) - 1
         is_params = load('reproducibility', 'generation_'+str(generation)+'.pkl')
         if type(is_params) != str:
@@ -161,8 +165,8 @@ def on_pop_gen(ga):
             multiscan = True
         else:
             multiscan = False
-            
-        if config['rerun'] or checkpoints:
+
+        if config['rerun']:
             frame = ''
         else:
             frame = load('', task+'.pkl')
@@ -184,16 +188,18 @@ def on_pop_gen(ga):
             iterations = iterations_
         
         existing_checkpoints = glob.glob(out_dir + '/checkpoints_' + task + '_batch_*_done')
-        
+
         for batch in range(iterations):
+            checkpoints = glob.glob('/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)+ '/checkpoint_*.pkl')
             if checkpoints:
-                workflows = glob.glob('/scratch/processed/reproducibility/' + task + '_workflow*')
+                workflows = glob.glob('/scratch_dir/processed/reproducibility/' + task + '_workflow*')
                 last_batch = len(workflows) - 1
                 if batch < last_batch:
                     continue
                 elif batch == last_batch:
                     frame = load('', task+'.pkl')
                     frame.drop(range(batch*batch_size, (batch+1)*batch_size))
+
                 
             if (batch+1) * batch_size < pop_.shape[0]:
                 params = params_[:, batch*batch_size:(batch+1)*batch_size]
@@ -253,6 +259,7 @@ def on_pop_gen(ga):
                 pop = params.transpose()
                 master, expand_inputs, _ = generate_dictionaries(map_genes, links, params, pop, multiscan, wiggle, start_ind, frame)
             
+            
             out_frame = save('', task+'.pkl', unique_pipelines)
             
             if 'anat' in types and 'func' in types and to_run:
@@ -263,11 +270,12 @@ def on_pop_gen(ga):
                     pipelines = analysis(exp_dir, task+'_'+working_dir+'_'+str(batch), data_dir, out_dir)
                     pipelines = pipelines.construct(subjects, sessions, runs, task, pipeline, master, expand_inputs, config['split_half'], to_run, config['networks'], out_frame)
                     pipelines.inputs.inputnode.mask = mask
+
                     pipelines.inputs.inputnode.task = task
+
                     
                     if os.path.exists(save_dir + '_done') and config['rerun']:
                         wf_path = save('reproducibility', task + '_workflow_' + str(batch) + '.pkl', pipelines)
-                        shutil.rmtree(wf_path)
                     elif config['rerun'] and os.path.exists(save_dir) and glob.glob(save_dir + '/crash-*'):
                         for crash in glob.glob(save_dir + '/crash-*'):
                             os.remove(crash)
@@ -305,11 +313,11 @@ def on_pop_gen(ga):
                     if not config['debug'] and not glob.glob(save_dir + '/crash-*'):
                         os.rename(save_dir, save_dir + '_done')
                         os.mkdir(out_dir + '/reproducibility/' + task + '_batch_' + str(batch) + '/configuration')
-                        shutil.rmtree('/scratch/' + working_dir)
+                        shutil.rmtree('/scratch_dir/' + working_dir)
                 
     if 'num_generations' not in config:
-        if checkpoints:
-            os.rename('/scratch/processed/reproducibility/checkpoints', '/scratch/processed/reproducibility/checkpoints_finished')
+        # if checkpoints:
+            # os.rename('/scratch_dir/processed/reproducibility/checkpoints', '/scratch_dir/processed/reproducibility/checkpoints_finished')
         
         #TODO: DATA ANALYSIS
         sys.exit()#return "stop"
@@ -380,4 +388,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-

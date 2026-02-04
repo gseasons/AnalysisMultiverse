@@ -184,11 +184,11 @@ USER root
 RUN echo "source activate multiverse" >> ~/.bashrc
 SHELL ["/bin/bash", "--login", "-c"]
 
-VOLUME ["/data", "/multiverse/code", "/scratch"]
+VOLUME ["/data", "/multiverse/code", "/scratch_dir"]
 
 USER multiverse
 
-WORKDIR /scratch
+WORKDIR /scratch_dir
 
 RUN echo '{ \
     \n  "pkg_manager": "apt", \
@@ -262,12 +262,12 @@ RUN echo '{ \
     \n      [ \
     \n        "/data", \
     \n        "/root/multiverse/code", \
-    \n        "/scratch" \
+    \n        "/scratch_dir" \
     \n      ] \
     \n    ], \
     \n    [ \
     \n      "workdir", \
-    \n      "/scratch" \
+    \n      "/scratch_dir" \
     \n    ] \
     \n  ] \
     \n}' > /neurodocker/neurodocker_specs.json

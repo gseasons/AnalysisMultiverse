@@ -15,7 +15,7 @@ import pickle
 from pathlib import Path
 import os
 
-exp_dir = '/scratch'
+exp_dir = '/scratch_dir'
 out_dir = exp_dir + '/processed'
 
 def no_mask(file):
@@ -623,6 +623,7 @@ def define_paths(container, dictionary, indexes):
         
     return container, out_dic, index_
 
+
 def load(path, file):
     out = os.path.join(out_dir, path, file)
     if os.path.isfile(out):
@@ -638,7 +639,6 @@ def save(path, file, frame):
     out = os.path.join(out_dir, path)
     Path(out).mkdir(parents=True, exist_ok=True)
     out = os.path.join(out, file)
-        
     with open(out, 'wb') as f:
         pickle.dump(frame, f)
     
@@ -711,7 +711,7 @@ def organize(task, out_frame):
             if isinstance(col, dict):
                 for key in col:
                     if task == 'rest':
-                        if isinstance(key, str) and ('gamma' in key or 'dgamma' in key):
+                        if isinstance(key, str) and ('gamma' in key or 'dgamma' in key or 'none' in key):
                             processed['pipeline'][pipeline]['parameters'][column] = key
                             processed['pipeline'][pipeline]['parameters']['l1d_derivs'] = col[key]['derivs']
                         elif isinstance(key, str) and 'custom' in key:
@@ -746,10 +746,3 @@ def mniMaskpre(mask):
         mask = os.path.join(os.getenv('FSLDIR'), 'data/standard/MNI152_T1_2mm_brain.nii.gz')
     
     return mask
-
-
-
-
-
-
-
