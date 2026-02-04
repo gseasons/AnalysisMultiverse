@@ -76,7 +76,7 @@ def smooth(warped, mask):
         smoothed = warped
         
     result = ImageStats(in_file=smoothed, op_string='-R').run().outputs.out_stat
-    if np.isnan(result):
+    if np.isnan(result).any():
         raise ValueError("NaN values detected in regressed image (preprocessing - workflows - regress")
         
     return smoothed
@@ -277,7 +277,6 @@ def mni(mniMask, brain, brainmask, warp, warped, segmentations, out_mat, start_i
                 brainmask = MaxImage(in_file=brainmask, dimension='T').run().outputs.out_file
             
     return warped, brainmask, segmentations, warp, startimg
-    
     
     
     

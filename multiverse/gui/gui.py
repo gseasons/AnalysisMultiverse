@@ -212,7 +212,8 @@ class MultiverseConfig():
         # Processing Mode
         ttk.Label(self.main_config, text='Processing mode (SLURM for compute cluster):').grid(row=10)
         self.process_mode_var = tk.StringVar()
-        self.process_mode_var.set('MultiProc')
+        # self.process_mode_var.set('MultiProc')
+        self.process_mode_var.set('Linear')
         self.parent_selection = tk.OptionMenu(self.main_config, self.process_mode_var, 'MultiProc', 'Linear', 'SLURM', command=self.slurm_block)
         self.parent_selection.grid(row=10, column=1)
 

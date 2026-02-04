@@ -184,7 +184,7 @@ class preprocess(spatial_normalization):
             masked = glob.glob(self.data_dir + '/brain_extracted/_subject_{sID}/*masked.nii.gz'.format(sID=sub))
             if not masked:
                 from niworkflows.anat.ants import init_brain_extraction_wf
-                bet = init_brain_extraction_wf(name='bet', omp_nthreads=2, mem_gb=3)
+                bet = init_brain_extraction_wf(name='bet', omp_nthreads=2, mem_gb=3, atropos_use_random_seed=False)
                 brain_extracted = False
                 break
         

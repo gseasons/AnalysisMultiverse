@@ -7,7 +7,7 @@ Created on Mon Nov  1 14:45:59 2021
 """
 import subprocess
 import argparse, sys, os, json, pickle, re
-from multiverse.gui.gui import MultiverseConfig
+# from multiverse.gui.gui import MultiverseConfig #Mah#since we are not using GUI this needs to be commented out otherwise i get a error on a library that is not installed originally on my cluster
 from os.path import join as opj
 #import numpy as np
 from math import ceil
@@ -18,7 +18,8 @@ dir = os.path.dirname(os.path.abspath(__file__))
 def parse(start):
     args = start.parse_args()
     run_now = False
-    process_mode = 'MultiProc'
+    # process_mode = 'MultiProc' #(this needs to be changed to SLURM in cluster)
+    process_mode = 'SLURM' #Mah
     if args.config or args.run:
         if args.data == None and not args.config:
             print('Either -d must be set, or -c must be used')
@@ -74,16 +75,16 @@ def main():
     start.add_argument('-o', '--out', type=str, metavar="OUT_DIR", action='store', help='path to store outputs')
 
     run_now, args, process_mode, config = parse(start)
+
     
     if run_now:
         code_dir = os.path.join(dir, 'multiverse')
+
         #IF TEMPLATE FLOW FAILS, UNCOMMENT LINES 82-84, AND COMMENT LINES 79-80
-# =============================================================================
-#         volumes = ['{code}:/multiverse/code'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
-#                    '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir)]
+
 # =============================================================================
         volumes = ['{code}:/code/multiverse'.format(code=code_dir), '{data}:/data'.format(data=args.data), 
-                   '{work_dir}:/scratch'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir),
+                   '{work_dir}:/scratch_dir'.format(work_dir=args.out), '{code}/plugins_base.py:/opt/miniconda-latest/envs/multiverse/lib/python3.8/site-packages/nipype/pipeline/plugins/base.py'.format(code=code_dir),
                    '{code}/templateflow:/home/multiverse/.cache/templateflow'.format(code=code_dir)]
         if process_mode != 'SLURM':
             try:
@@ -106,7 +107,7 @@ def main():
                 
             try:
                 print('Running Container')
-                container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes, user='root')
+                container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch_dir', volumes=volumes, user='root')
                 container.start()
                 container.exec_run('sudo /bin/bash -c "source activate multiverse ; python /code/multiverse/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
@@ -118,7 +119,7 @@ def main():
                 for line in client.api.pull('gseasons/multiverse', stream=True, decode=True):
                     print(json.dumps(line, indent=4))
                     
-                container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch', volumes=volumes)
+                container = client.containers.run('gseasons/multiverse:cluster', detach=True, tty=True, stdin_open=True, working_dir='/scratch_dir', volumes=volumes)
                 container.start()
                 container.exec_run('/bin/bash -c "source activate multiverse ; python /code/multiverse/run_multiverse.py {0}"'.format(args.rerun))
                 container.stop()
@@ -133,7 +134,6 @@ def main():
                 config['ntasks'] = config['cpu_node']
                 
                 split_ = re.split('-|:', config['time'])
-                
                 time_s = 0
                 for k, sp in enumerate(split_):
                     if not k:
@@ -144,8 +144,8 @@ def main():
                         time_s += int(sp) * 60
                     else:
                         time_s += int(sp)
-                time_s = time_s / (config['batches'] * config['cpu_node']) #(config['pipelines'] * int(ceil(int(config['cpu_node']) / 4))) #(config['pipelines'] * int(ceil(int(config['cpu_node']) / 4)))
-                
+
+                time_s = time_s / int(ceil(int(config['cpu_node']) * config['batches']))
                 days = int(time_s / (24 * 3600))
                 hours = max(int(time_s / 3600) - days * 24, 0)
                 minutes = max(int(time_s / 60) - days * 24 * 60 - hours * 60, 0)
@@ -153,9 +153,15 @@ def main():
                 
                 config['time'] =  str(days) + '-' + str(hours) + ':' + str(minutes) + ':' + str(seconds)
                 config['mem'] = str(int(ceil(float(config['mem']) * int(config['cpu_node'])))) + "G"
-                #config['batches'] = int(ceil(int(config['cpu_node']) / 4))
-                
-                subprocess.call(['{0}/configuration/intermediate.sh'.format(code_dir), args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']])
+
+                print("config['time']: ", config['time'])
+                cmd = [f"{code_dir}/configuration/intermediate.sh", args.data, args.out, str(args.rerun), config['nodes'], config['ntasks'], config['account'], config['time'], config['mem']]
+                print("Running command:", " ".join(cmd))
+                try:
+                    result = subprocess.run(cmd, check=True)
+                    print("Script ran successfully.")
+                except subprocess.CalledProcessError as e:
+                    print(f"Script failed with return code {e.returncode}")
             else:
                 subprocess.call(['sbatch', '--nodes={0}'.format(config['nodes']), '--ntasks={0}'.format([config['ntasks']]), '--account={0}'.format(config['account']), '--time={0}'.format(config['time']), '--mem={0}'.format(config['mem']), 'multiverse/configuration/multiverse.sh', args.data, args.out, str(args.rerun)])
             

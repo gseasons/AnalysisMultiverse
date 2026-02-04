@@ -15,69 +15,72 @@ from matplotlib.collections import LineCollection
 import nibabel as nib
 import numpy as np
 
-processed = '/scratch/processed'
+
+
+processed = '/scratch_dir/processed'
+
+
+# if len(sys.argv) > 2:
+#     task = sys.argv[1]
+#     sq = sys.argv[2]
+
+# out_frame = processed + '/{task}.pkl'.format(task=task)
+# # out_frame = '/Volumes/NewVolume/_i_0/rest.pkl'
+# task= 'rest'
+# if True:#sq.count('batch.sh') == 1:
+#     paths = organize(task, out_frame)
     
-if len(sys.argv) > 2:
-    task = sys.argv[1]
-    sq = sys.argv[2]
-    
-#out_frame = processed + '/{task}.pkl'.format(task=task)
-out_frame = '/Volumes/NewVolume/_i_0/rest.pkl'
-task= 'rest'
-if True:#sq.count('batch.sh') == 1:
-    paths = organize(task, out_frame)
-    
-    with open(paths, 'rb') as f:
-        paths = pickle.load(f)
-    #HARDCODED
-    with open('/Volumes/NewVolume/_i_0/generation_0.pkl', 'rb') as f:
-        pipelines = pickle.load(f)
+#     with open(paths, 'rb') as f:
+#         paths = pickle.load(f)
+#     #HARDCODED
+#     with open('/Volumes/NewVolume/_i_0/generation_0.pkl', 'rb') as f:
+#         pipelines = pickle.load(f)
         
-    mds = MDS()
-    embedded = mds.fit_transform(pipelines.transpose())
-    fig = plt.figure(1)
-    ax = plt.axes()
-    plt.scatter(embedded[:,0], embedded[:,1])
-    plt.scatter(embedded[:8,0], embedded[:8,1])
+#     mds = MDS()
+#     embedded = mds.fit_transform(pipelines.transpose())
+#     fig = plt.figure(1)
+#     ax = plt.axes()
+#     plt.scatter(embedded[:,0], embedded[:,1])
+#     plt.scatter(embedded[:8,0], embedded[:8,1])
     
-    segments = []
-    similarity = []
+#     segments = []
+#     similarity = []
     
-    for i, x in enumerate(embedded[:8]):
-        for j, y in enumerate(embedded[:8]):
-            if i >= j:
-                continue
+#     for i, x in enumerate(embedded[:8]):
+#         for j, y in enumerate(embedded[:8]):
+#             if i >= j:
+#                 continue
             
-            paths1 = paths['pipeline'][i]['network']
-            out_stats = []
-            #
-            for k in range(len(paths['pipeline'][i]['network'])):
-                for l, m in enumerate(list(paths['pipeline'][i]['network'][k]['contrast'].values())):
-                    m2 = list(paths['pipeline'][j]['network'][k]['contrast'].values())[l]
-                    out = np.corrcoef(np.array(nib.load(m).dataobj).flatten(), np.array(nib.load(m2).dataobj).flatten())[0,1]
-                    out_stats.append(out)
+#             paths1 = paths['pipeline'][i]['network']
+#             out_stats = []
+#             #
+#             for k in range(len(paths['pipeline'][i]['network'])):
+#                 for l, m in enumerate(list(paths['pipeline'][i]['network'][k]['contrast'].values())):
+#                     m2 = list(paths['pipeline'][j]['network'][k]['contrast'].values())[l]
+#                     out = np.corrcoef(np.array(nib.load(m).dataobj).flatten(), np.array(nib.load(m2).dataobj).flatten())[0,1]
+#                     out_stats.append(out)
             
-            out = [abs(stat) for stat in out_stats if not np.isnan(stat)]
-            out = np.mean(out_stats)
-            if np.isnan(out):
-                out = 0
-                continue
-            else:
-                pass
-                #out = abs(out)
+#             out = [abs(stat) for stat in out_stats if not np.isnan(stat)]
+#             out = np.mean(out_stats)
+#             if np.isnan(out):
+#                 out = 0
+#                 continue
+#             else:
+#                 pass
+#                 #out = abs(out)
                 
-            similarity.append(out)
+#             similarity.append(out)
             
-            segments.append([list(x), list(y)])
+#             segments.append([list(x), list(y)])
         
-    similarity = np.array(similarity)
-    values = np.abs(similarity)
-    lc = LineCollection(segments, linewidths=np.full(len(segments), 1), zorder=0, cmap=plt.cm.Purples, norm=plt.Normalize(0, values.max()))
-    lc.set_array(similarity)
-    ax.add_collection(lc)
+#     similarity = np.array(similarity)
+#     values = np.abs(similarity)
+#     lc = LineCollection(segments, linewidths=np.full(len(segments), 1), zorder=0, cmap=plt.cm.Purples, norm=plt.Normalize(0, values.max()))
+#     lc.set_array(similarity)
+#     ax.add_collection(lc)
     
-    plt.show()
-    A=3
+#     plt.show()
+#     A=3
             
         
     

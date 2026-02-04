@@ -122,7 +122,8 @@ class DistributedPluginBase(PluginBase):
         task = self.__dict__['plugin_args']['task']
         batch = self.__dict__['plugin_args']['batch']
         
-        checkpoints = glob('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_*.pkl')
+        checkpoints = glob('/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_*.pkl')
+
         if checkpoints:
             checkpoints = sorted(checkpoints, key=lambda val: int(re.search('.*_([0-9]+)', val).group(1)))
             count = 1
@@ -142,6 +143,8 @@ class DistributedPluginBase(PluginBase):
                         count += 1
                         _recent = checkpoints[-count]
                         
+            self.hours_elapsed = len(checkpoints)
+            
             if 'iparallel' in self.__dict__:
                 indices = range(saved_state['refidx'].shape[0])
                 for idx in indices:
@@ -211,10 +214,11 @@ class DistributedPluginBase(PluginBase):
             
             temp.pop('plugin_args')    
             temp.pop('timestamp')
+
+            file_name = '/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_' + str(int(stamp)) + '.pkl' 
             
-            file_name = '/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch) + '/checkpoint_' + str(int(stamp)) + '.pkl'
-            if not os.path.exists('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)):
-                os.makedirs('/scratch/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
+            if not os.path.exists('/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)):
+                os.makedirs('/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch))
             with open(file_name, 'wb') as f:
                 pickle.dump(temp, f)
             
@@ -242,7 +246,15 @@ class DistributedPluginBase(PluginBase):
         errors = []
         self.hours_elapsed = 0
         
-        if str2bool(self._config["execution"]["remove_node_directories"]):
+        temp = self.__dict__.copy()
+        task = temp['plugin_args']['task']
+        batch = temp['plugin_args']['batch']
+        
+        file_name = '/scratch_dir/processed/reproducibility/checkpoints_' + task + '_batch_' + str(batch)
+        check = glob(os.path.join(file_name, 'checkpoint_*.pkl'))
+
+        # if str2bool(self._config["execution"]["remove_node_directories"]):
+        if check:
             self._load_state()
         self.STOP = False
 
@@ -287,7 +299,9 @@ class DistributedPluginBase(PluginBase):
                     result = self._get_result(taskid)
                 except Exception as exc:
                     if not self.STOP:
-                        self._save_state(self.hours_elapsed + 1)
+                        self.hours_elapsed += 1
+                        print('we are here except Exception as exc: self.hours_elapsed: ' , self.hours_elapsed) 
+                        self._save_state(self.hours_elapsed)
                     
                     self.STOP = True
                     notrun.append(self._clean_queue(jobid, graph))
@@ -296,7 +310,9 @@ class DistributedPluginBase(PluginBase):
                     if result:
                         if result["traceback"]:
                             if not self.STOP:
-                                self._save_state(self.hours_elapsed + 1)
+                                self.hours_elapsed += 1
+                                print('we are here result["traceback"]: self.hours_elapsed: ' , self.hours_elapsed) 
+                                self._save_state(self.hours_elapsed)
                             
                             self.STOP = True
                             
@@ -305,13 +321,19 @@ class DistributedPluginBase(PluginBase):
                             )
                             errors.append("".join(result["traceback"]))
                         else:
+                            if (time() - self.timestamp) / 3600 > 0.5:   # 0.5 = every 30 mintunes
+                                self.hours_elapsed += 1
+                                self._save_state(self.hours_elapsed)
+                                self.timestamp = time()
+                                
                             self._task_finished_cb(jobid)
                             self._remove_node_dirs()
                         self._clear_task(taskid)
                     else:
                         assert self.proc_done[jobid] and self.proc_pending[jobid]
                         toappend.insert(0, (taskid, jobid))
-
+                        
+            
             if toappend:
                 self.pending_tasks.extend(toappend)
 
@@ -702,7 +724,7 @@ class DistributedPluginBase(PluginBase):
                             )
                             shutil.rmtree(outdir)
                             
-            if (time() - self.timestamp) / 3600 > 1:
+            if (time() - self.timestamp) / 3600 > 0.5:
                 self.hours_elapsed += 1
                 self._save_state(self.hours_elapsed)
                 self.timestamp = time()
