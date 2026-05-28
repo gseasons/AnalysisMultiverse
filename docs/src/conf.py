@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'AnalysisMultiverse'
-copyright = '2026, Brain Health Lab'
-author = 'Brain Health Lab'
+project = 'Analysis Multiverse Documentation'
+copyright = '2026 Brain Health Lab, St. Francis Xavier University'
+author = 'Kate Redfern'
 release = '0.0'
 
 # -- General configuration ---------------------------------------------------
