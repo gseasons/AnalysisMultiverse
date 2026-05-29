@@ -23,8 +23,9 @@ Kate Redfern
 
 .. attention::
 
-   This documentation project is under active devlopment! 
-   The site was last updated on: |update_month|_.
+   This documentation project is currently under active devlopment. 
+
+   This site was last updated on: |update_month|_.
 
 .. toctree::
    :maxdepth: 2
