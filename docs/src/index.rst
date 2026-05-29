@@ -29,7 +29,6 @@ Kate Redfern
 .. toctree::
    :maxdepth: 2
    :caption: Explore!
-   :titlesonly:
-   :includehidden:
+   :hidden:
 
-   Contributing <CONTRIBUTING>
+   :doc: Contributing </CONTRIBUTING>
