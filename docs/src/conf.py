@@ -34,6 +34,11 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
+html_theme_options = {
+    'logo_only': True,
+    'prev_next_buttons_location': 'both',
+    'style_nav_header_background': '#D25299'
+    }
 
 # -- Options for Markup ------------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-markup
