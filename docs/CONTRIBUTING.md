@@ -5,7 +5,7 @@ The Analysis Multiverse software (AMS) and its documentation should assume no co
 The AMS is intended to process functional magnetic resonance imaging (fMRI) data. The anticipated userbase for the AMS will be researchers from the fields of psychology, neuropsychology, neuroscience, and biology. These researchers may include student researchers. With this in mind, code should be as self-explanatory as possible. The documentation should assume no previous experience
 with running or installing software from GitHub, it should assume no previous experience with high performance computing (HPC), and should not assume any fluency with Python or any other programming languages. In essence, the documentation should be as accessible as possible, to facilitate the use of AMS by all potential users.
 
-These guidelines, as well as the documentation itself, are living documents. This means that they are meant to be updated and amended a necessary, dictated by the needs of the AMS contributors as well as the needs of the AMS users.
+These guidelines, as well as the documentation itself, are living documents. This means that they are meant to be updated and amended as necessary, dictated by the needs of the AMS contributors as well as the needs of the AMS users.
 
 # How to Contribute to the Repository
 
@@ -22,14 +22,14 @@ Use issues to...
 
 ## Pull Requests
 Fork the repository to submit pull requests (PRs) to contribute to the
-documentation or the codebase. Use the template provided when you go to submit the PR, replacing the text under each provided header. If specific header is not applicable, replace the template text with "N/A".
+documentation or the codebase. Use the template provided when you go to submit the PR, replacing the text under each provided header. If a specific header is not applicable, replace the template text with "N/A".
 
 Use an appropriate title based on the commit message subject formatting listed in the ***Commits*** section below.
 
 This information will be used to create a commit message if your pull request is accepted, so please be thorough in your documentation. Improper documentation of your changes will result in a request for changes until the documentation is adequate.
 
 ## Commits
-Why do good commit message matter?
+Why do good commit messages matter?
 
 Commit messages make up a permanent log of changes to a Git repository. Depending on the repository, the timeframe, and the number of contributors, the commit history can vary widely. As said by [Chris Beams](https://chris.beams.io/git-commit):
 > \[...\] a well-crafted Git commit message is the best way to communicate context about a change to fellow developers (and indeed to their future selves). A diff[^2] will tell you ***what*** changed, but only the commit message can properly tell you ***why***.
@@ -63,7 +63,7 @@ The subject should be limited to 50 characters, and must include a capitalized t
 - Documentation (_Docs_): Updates applied to textual resources, including comments within the code, README files, and typo corrections[^9].
 - Test (_Test_): The creation or revision or automated testing scripts[^10].
 - Continuous Integration (_CI_): Adjustments to continuous integration and deployment pipelines or scripts (e.g., GitHub Actions setups)[^11].
-- Build (_Build_): Alterations to external dependencies, compilation configurations, and project build tool[^12].
+- Build (_Build_): Alterations to external dependencies, compilation configurations, and project build tools[^12].
 - Revert (_Revert_): A commit that is being reverted[^13].
 - Chore (_Chore_): Any remaining development tasks that do not align with the specific labels above[^14].
 
