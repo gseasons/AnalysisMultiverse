@@ -19,7 +19,7 @@ release = '0.0'
 html_logo = 'icons/BrainHealthLabLogo.png'
 html_favicon = 'icons/mag_brain.ico'
 
-today = '%Y-%b-%d'
+today = '%Y-%m-%d'
 
 extensions = ['sphinx_rtd_theme']
 
@@ -43,7 +43,7 @@ html_theme_options = {
 # -- Options for Markup ------------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-markup
 
-rst_prolog = """
-.. |update_month| replace:: datetime.today()
+rst_prolog = f"""
+.. |update_month| replace:: {datetime.today().strftime('%Y-%m-%d')}
 .. _`update_month`: https://www.iso.org/iso-8601-date-and-time-format.html
 """
