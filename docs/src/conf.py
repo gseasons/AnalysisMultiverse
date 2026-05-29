@@ -41,7 +41,8 @@ html_static_path = ['_static']
 html_theme_options = {
     'logo_only': True,
     'prev_next_buttons_location': 'both',
-    'style_nav_header_background': '#D25299'
+    'style_nav_header_background': '#D25299',
+    'titles_only': True,
     }
 
 # -- Options for Markup ------------------------------------------------------
