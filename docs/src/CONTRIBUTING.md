@@ -1,4 +1,4 @@
-# About the Contribution Guidelines
+## About the Contribution Guidelines
 
 The Analysis Multiverse software (AMS) and its documentation should assume no computer science or programming background.
 
@@ -7,9 +7,9 @@ with running or installing software from GitHub, it should assume no previous ex
 
 These guidelines, as well as the documentation itself, are living documents. This means that they are meant to be updated and amended as necessary, dictated by the needs of the AMS contributors as well as the needs of the AMS users.
 
-# How to Contribute to the Repository
+## How to Contribute to the Repository
 
-## Issues[^1]
+### Issues[^1]
 
 This section lists the suggested use for issues on GitHub, but please keep in mind that the documentation is still a work in progress, and the codebase is still being tested and developed. The issue you highlight may already be on our "To Do" list! 
 
@@ -20,7 +20,7 @@ Use issues to...
  - Suggest clarifications for a specific section of the documentation, or in general
  - Suggest content that should be included in the documentation
 
-## Pull Requests
+### Pull Requests
 Fork the repository to submit pull requests (PRs) to contribute to the
 documentation or the codebase. Use the template provided when you go to submit the PR, replacing the text under each provided header. If a specific header is not applicable, replace the template text with "N/A".
 
@@ -28,7 +28,7 @@ Use an appropriate title based on the commit message subject formatting listed i
 
 This information will be used to create a commit message if your pull request is accepted, so please be thorough in your documentation. Improper documentation of your changes will result in a request for changes until the documentation is adequate.
 
-## Commits
+### Commits
 Why do good commit messages matter?
 
 Commit messages make up a permanent log of changes to a Git repository. Depending on the repository, the timeframe, and the number of contributors, the commit history can vary widely. As said by [Chris Beams](https://chris.beams.io/git-commit):
@@ -52,7 +52,7 @@ The required format will be as follows, with further details below:
 | EMPTY LINE | empty |
 | FOOTER | \[optional\] |
 
-### Subject Line
+#### Subject Line
 
 The subject should be limited to 50 characters, and must include a capitalized type. The commit type can be one of the following, and should utilize the short form in parentheses[^3]:
 - Feature (_Feat_): Introduces a new feature to the codebase[^4].
@@ -83,7 +83,7 @@ Beams recommends a quick way to gauge whether your subject line description is w
 
 If the completed sentence makes grammatical sense, you're on the right track!
 
-### Co-Authors
+#### Co-Authors
 
 If there are any co-authors on the commit, these should be added first after an inserted empty line[^15]. But before you can add a co-author, you must know the appropriate email to use if you want them to get contribution credit on GitHub[^16].
 
@@ -98,7 +98,7 @@ $ git commit -m "Refactor usability tests.
 
 Add another empty line[^18] before continuing to the content of the body. If there are no co-authors, only one empty line[^19] is required between the subject line and the body.
 
-### Body
+#### Body
 
 While not entirely necessary for smaller, self-explanatory changes, further explanation than the brief subject line may be required or beneficial in many cases. If it is not immediately obvious from the subject line description, include the following information:
 - **Where**: If necessary, give a detailed description of where the change is being made. Include file names and line numbers.
@@ -110,7 +110,7 @@ While not entirely necessary for smaller, self-explanatory changes, further expl
 
 Structurally, ensure the body text wraps at 72 characters. This follows the docstrings and comments line length restrictions followed by [Python's PEP 8](https://peps.python.org/pep-0008/#maximum-line-length).
 
-### Footer
+#### Footer
 
 If applicable, link to any existing related issues or PRs. Link [directly](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue) if you can. Use the keywords provided by GitHub to refer to these issues or PRs.
 
@@ -128,7 +128,7 @@ Wallace Freitas wrote an article about [best practices for commits](https://dev.
 
 The subject line scope is optional, but if it is included, it should consist of a noun describing a section of the codebase or documentation surrounded by parentheses, for example: `Docs(README): fix typo in line 5`[^22]. Using the scope may remove the need to complete the body of the commit message, if it provides enough information when combined with the description.
 
-#### References[^23]:
+###### References[^23]:
 
 [^1]: Inspiration for the ***Issues*** section drawn from Dr. James Hughes' [cs101 repository](https://github.com/jameshughes89/cs101).
 [^2]: [Diff](https://git-scm.com/docs/git-diff): "Show changes between the working tree and the index or a tree, changes between the index and a tree, changes between two trees, changes resulting from a merge, changes between two blob objects, or changes between two files on disk."
