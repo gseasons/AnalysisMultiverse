@@ -27,8 +27,9 @@ Kate Redfern
    | The site was last updated on: |update_month|_.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Explore the Docs!
+   :maxdepth: 1
+   :caption: About the Docs
+   :titlesonly:
    :hidden:
 
-   Contributing </CONTRIBUTING>
+   Contributing </CONTRIBUTING.md>
