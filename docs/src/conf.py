@@ -44,6 +44,6 @@ html_theme_options = {
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-markup
 
 rst_prolog = """
-.. |update_month| replace:: {datetime.today()}
+.. |update_month| replace:: datetime.today()
 .. _`update_month`: https://www.iso.org/iso-8601-date-and-time-format.html
 """
