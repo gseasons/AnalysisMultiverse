@@ -32,4 +32,4 @@ Kate Redfern
    :titlesonly:
    :hidden:
 
-   Contributing </CONTRIBUTING.md>
+   contributing_wrapper.md
