@@ -32,5 +32,4 @@ Kate Redfern
    :titlesonly:
    :includehidden:
 
-   About <main/README>
-   Contributing <docs/CONTRIBUTING>
+   Contributing <CONTRIBUTING>
