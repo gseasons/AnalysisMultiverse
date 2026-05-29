@@ -1,9 +1,9 @@
 .. AnalysisMultiverse documentation master file, created by
    sphinx-quickstart on Thu May 28 14:29:42 2026.
 
-################################################
-Welcome to the Analysis Multiverse Documentation
-################################################
+##########################################
+Analysis Multiverse Software Documentation
+##########################################
 
 This documentation website is an ongoing work-in-progress for the Analysis 
 Multiverse software project, led by Dr. Erin Mazerolle's `Brain Health Lab 
