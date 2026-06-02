@@ -8,7 +8,7 @@ from datetime import datetime
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Analysis Multiverse Documentation'
+project = 'Analysis Multiverse Software'
 copyright = '2026 Brain Health Lab, St. Francis Xavier University'
 author = 'Kate Redfern'
 release = '0.0'
